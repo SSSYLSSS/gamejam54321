@@ -193,33 +193,33 @@ function GameLogic.PlayerDiscard(state, discardIndices)
         table.insert(state.discardPile, card)
     end
     
-    -- 记录待处理的J数量(玩家需要选择从弃牌堆还是抽牌堆抽牌)
+    -- 记录待处理的J数量(玩家需要选择从弃牌堆还是抽牌堆随机抽牌)
     state.pendingJackPicks = jackCount
     
-    -- 抽取相同张数的新牌(不含J的额外抽取)
-    local drawCount = #discarded
-    for _ = 1, drawCount do
+    -- 非J弃牌正常从抽牌堆补牌
+    local normalDrawCount = #discarded - jackCount
+    for _ = 1, normalDrawCount do
         local card = GameLogic.DrawFromDeck(state.playerDeck, state.discardPile)
         if card then
             table.insert(state.playerHand, card)
         end
     end
     
-    GameLogic.AddLog(state, string.format("弃置 %d 张, 抽取 %d 张", #discarded, drawCount))
+    GameLogic.AddLog(state, string.format("弃置 %d 张, 正常补牌 %d 张", #discarded, normalDrawCount))
     
     if jackCount > 0 then
-        GameLogic.AddLog(state, string.format("J 弃置效果: 可从弃牌堆或抽牌堆中选取 %d 张牌", jackCount))
+        GameLogic.AddLog(state, string.format("J 弃置效果: 需选择牌堆随机抽牌 %d 次", jackCount))
     end
     
     return true, nil
 end
 
---- 玩家J效果: 从指定牌堆中选取一张指定的牌
+--- 玩家J效果: 从指定牌堆中随机抽取一张牌
 ---@param state table
 ---@param source string "discard" 或 "deck"
----@param cardIndex number 在该牌堆中的索引
----@return boolean, string
-function GameLogic.PlayerJackPick(state, source, cardIndex)
+---@return boolean success
+---@return string|nil errMsg
+function GameLogic.PlayerJackPick(state, source)
     if not state.pendingJackPicks or state.pendingJackPicks <= 0 then
         return false, "没有待处理的J效果"
     end
@@ -237,19 +237,17 @@ function GameLogic.PlayerJackPick(state, source, cardIndex)
         return false, "该牌堆为空"
     end
     
-    if cardIndex < 1 or cardIndex > #pile then
-        return false, "无效索引"
-    end
-    
-    local card = table.remove(pile, cardIndex)
+    -- 随机抽一张
+    local randIdx = math.random(1, #pile)
+    local card = table.remove(pile, randIdx)
     table.insert(state.playerHand, card)
     state.pendingJackPicks = state.pendingJackPicks - 1
     
-    GameLogic.AddLog(state, string.format("J效果: 从%s中抽取了 %s",
+    GameLogic.AddLog(state, string.format("J效果: 从%s中随机抽到 %s",
         source == "discard" and "弃牌堆" or "抽牌堆",
         CardDefs.GetCardName(card)))
     
-    return true, nil
+    return true, nil, card
 end
 
 --- AI执行弃牌换牌操作

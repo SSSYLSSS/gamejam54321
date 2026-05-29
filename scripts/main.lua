@@ -1383,51 +1383,13 @@ function ClosePileView()
     end
 end
 
---- 显示J效果选牌弹窗(从弃牌堆或抽牌堆选一张)
+--- 显示J效果选牌堆弹窗(选择从弃牌堆还是抽牌堆随机抽一张)
 function ShowJackPickUI()
     subPhase = "jack_pick"
     
-    local discardPile = gameState.discardPile
-    local deckPile = gameState.playerDeck
+    local discardCount = #gameState.discardPile
+    local deckCount = #gameState.playerDeck
     local remaining = gameState.pendingJackPicks or 0
-    
-    -- 弃牌堆的牌(可选)
-    local discardWidgets = {}
-    if #discardPile == 0 then
-        table.insert(discardWidgets, UI.Label {
-            text = "（空）",
-            fontSize = 12,
-            fontColor = COLORS.textDim,
-        })
-    else
-        for i, card in ipairs(discardPile) do
-            local idx = i
-            local w = CreateCardWidget(card, i, false, true)
-            w:OnEvent("click", function()
-                OnJackPickCard("discard", idx)
-            end)
-            table.insert(discardWidgets, w)
-        end
-    end
-    
-    -- 抽牌堆的牌(可选)
-    local deckWidgets = {}
-    if #deckPile == 0 then
-        table.insert(deckWidgets, UI.Label {
-            text = "（空）",
-            fontSize = 12,
-            fontColor = COLORS.textDim,
-        })
-    else
-        for i, card in ipairs(deckPile) do
-            local idx = i
-            local w = CreateCardWidget(card, i, false, true)
-            w:OnEvent("click", function()
-                OnJackPickCard("deck", idx)
-            end)
-            table.insert(deckWidgets, w)
-        end
-    end
     
     local overlay = UI.Panel {
         id = "jackPickOverlay",
@@ -1439,86 +1401,47 @@ function ShowJackPickUI()
         alignItems = "center",
         children = {
             UI.Panel {
-                width = "90%",
-                maxHeight = "85%",
+                width = 300,
                 backgroundColor = COLORS.menuCard,
                 borderRadius = 12,
                 borderWidth = 1,
                 borderColor = { 150, 80, 200, 150 },
-                padding = 16,
-                gap = 10,
+                padding = 24,
+                gap = 16,
                 alignItems = "center",
                 children = {
                     -- 标题
                     UI.Label {
-                        text = string.format("J 效果: 选择一张牌加入手牌 (剩余%d次)", remaining),
-                        fontSize = 15,
+                        text = "J 弃置效果",
+                        fontSize = 18,
                         fontColor = COLORS.jokerPurple,
+                    },
+                    UI.Label {
+                        text = string.format("选择一个牌堆随机抽取一张牌\n(剩余 %d 次)", remaining),
+                        fontSize = 13,
+                        fontColor = COLORS.textDim,
                         textAlign = "center",
                     },
-                    -- 弃牌堆区域
-                    UI.Panel {
-                        width = "100%",
-                        gap = 6,
-                        children = {
-                            UI.Label {
-                                text = string.format("弃牌堆 (%d张) - 点击选取", #discardPile),
-                                fontSize = 13,
-                                fontColor = COLORS.danger,
-                            },
-                            UI.ScrollView {
-                                width = "100%",
-                                height = 90,
-                                children = {
-                                    UI.Panel {
-                                        flexDirection = "row",
-                                        flexWrap = "wrap",
-                                        gap = 5,
-                                        padding = 4,
-                                        children = discardWidgets,
-                                    }
-                                }
-                            },
-                        }
-                    },
-                    -- 分隔线
-                    UI.Panel {
-                        width = "100%",
-                        height = 1,
-                        backgroundColor = COLORS.menuBorder,
-                    },
-                    -- 抽牌堆区域
-                    UI.Panel {
-                        width = "100%",
-                        gap = 6,
-                        children = {
-                            UI.Label {
-                                text = string.format("抽牌堆 (%d张) - 点击选取", #deckPile),
-                                fontSize = 13,
-                                fontColor = COLORS.accent,
-                            },
-                            UI.ScrollView {
-                                width = "100%",
-                                height = 90,
-                                children = {
-                                    UI.Panel {
-                                        flexDirection = "row",
-                                        flexWrap = "wrap",
-                                        gap = 5,
-                                        padding = 4,
-                                        children = deckWidgets,
-                                    }
-                                }
-                            },
-                        }
-                    },
-                    -- 跳过按钮
+                    -- 两个选择按钮
                     UI.Button {
-                        text = "跳过(不抽牌)",
-                        fontSize = 12,
-                        height = 34,
-                        marginTop = 4,
-                        onClick = function() OnJackPickSkip() end,
+                        text = string.format("从弃牌堆抽 (%d张)", discardCount),
+                        width = "100%",
+                        height = 44,
+                        fontSize = 14,
+                        backgroundColor = { 100, 45, 45, 220 },
+                        borderRadius = 8,
+                        disabled = discardCount == 0,
+                        onClick = function() OnJackPickChoice("discard") end,
+                    },
+                    UI.Button {
+                        text = string.format("从抽牌堆抽 (%d张)", deckCount),
+                        width = "100%",
+                        height = 44,
+                        fontSize = 14,
+                        backgroundColor = { 45, 45, 100, 220 },
+                        borderRadius = 8,
+                        disabled = deckCount == 0,
+                        onClick = function() OnJackPickChoice("deck") end,
                     },
                 }
             },
@@ -1528,17 +1451,22 @@ function ShowJackPickUI()
     uiRoot:AddChild(overlay)
 end
 
---- J效果: 玩家选了一张牌
-function OnJackPickCard(source, cardIndex)
-    local success, err = GameLogic.PlayerJackPick(gameState, source, cardIndex)
+--- J效果: 玩家选择了牌堆
+function OnJackPickChoice(source)
+    local success, err, card = GameLogic.PlayerJackPick(gameState, source)
     if not success then
-        UpdateInfoLabel(err or "选取失败")
+        UpdateInfoLabel(err or "抽取失败")
         return
     end
     
     -- 关闭弹窗
     local overlay = uiRoot:FindById("jackPickOverlay")
     if overlay then overlay:Remove() end
+    
+    -- 显示抽到的牌
+    local cardName = card and CardDefs.GetCardName(card) or "?"
+    UpdateInfoLabel(string.format("J效果: 从%s中随机抽到 %s",
+        source == "discard" and "弃牌堆" or "抽牌堆", cardName))
     
     -- 还有J待处理?
     if gameState.pendingJackPicks and gameState.pendingJackPicks > 0 then
@@ -1549,17 +1477,6 @@ function OnJackPickCard(source, cardIndex)
         subPhase = "ai_turn"
         FinishPlayerTurnAfterJack()
     end
-end
-
---- J效果: 跳过
-function OnJackPickSkip()
-    gameState.pendingJackPicks = 0
-    
-    local overlay = uiRoot:FindById("jackPickOverlay")
-    if overlay then overlay:Remove() end
-    
-    subPhase = "ai_turn"
-    FinishPlayerTurnAfterJack()
 end
 
 --- J效果处理完后继续游戏流程
