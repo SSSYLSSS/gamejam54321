@@ -9,13 +9,13 @@ local Constant = require("core.Constant")
 
 local CardWidget = {}
 
--- 卡牌尺寸
-local CARD_WIDTH = 72
-local CARD_HEIGHT = 100
+-- 卡牌尺寸 (3倍大)
+local CARD_WIDTH = 216
+local CARD_HEIGHT = 300
 
 -- AI 卡牌尺寸 (稍小)
-local AI_CARD_WIDTH = 60
-local AI_CARD_HEIGHT = 84
+local AI_CARD_WIDTH = 120
+local AI_CARD_HEIGHT = 168
 
 -- 颜色定义
 local COLORS = {
@@ -47,10 +47,10 @@ local function getCardEffectText(card)
     if rank == 7 then return "7: 不可被改变点数/删除, 3张7触发特殊胜负" end
     if rank == 8 then return "8: 使自己普通牌(2~6)点数各减1" end
     if rank == 9 then return "9: 结算时点数可视为0或9" end
-    if rank == 10 then return "10: 若弃置过此牌, 最终点数+1" end
-    if rank == 11 then return "J: 弃置时从弃牌堆抽牌; 结算前翻倍对方普通牌" end
-    if rank == 12 then return "Q: 结算时使对方点数最小的牌变为0" end
-    if rank == 13 then return "K: 手中每张K最终点数+1" end
+    if rank == 10 then return "10(10点): 若弃置过此牌, 最终点数+1" end
+    if rank == 11 then return "J(11点): 弃置时从弃牌堆抽牌; 结算前翻倍对方普通牌" end
+    if rank == 12 then return "Q(12点): 结算时使对方点数最小的牌变为0" end
+    if rank == 13 then return "K(13点): 手中每张K最终点数+1" end
     if rank >= 2 and rank <= 6 then
         return string.format("%d: 普通牌, %d点", rank, rank)
     end
@@ -76,26 +76,26 @@ function CardWidget.Create(card, opts)
     local hoverBorderColor = isSelected and { 60, 140, 255, 255 } or { 120, 150, 200, 200 }
     local borderWidth = isSelected and 2 or 1
 
-    local rankFontSize = isAI and 14 or 18
-    local suitFontSize = isAI and 22 or 28
+    local rankFontSize = isAI and 28 or 54
+    local suitFontSize = isAI and 44 or 84
 
     local cardContent
     if not card then
         -- 牌背
         cardContent = {
             UI.Panel {
-                width = w - 12,
-                height = h - 12,
+                width = w - 20,
+                height = h - 20,
                 backgroundColor = COLORS.cardBackBg,
-                borderRadius = 4,
-                borderWidth = 1,
+                borderRadius = 8,
+                borderWidth = 2,
                 borderColor = { 70, 90, 130, 200 },
                 justifyContent = "center",
                 alignItems = "center",
                 children = {
                     UI.Label {
                         text = "?",
-                        fontSize = isAI and 24 or 30,
+                        fontSize = isAI and 40 or 72,
                         fontColor = { 120, 140, 180, 255 },
                         textAlign = "center",
                     },

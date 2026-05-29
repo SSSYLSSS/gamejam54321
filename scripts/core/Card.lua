@@ -63,10 +63,8 @@ function Card.GetBasePoints(card)
     if card.category == Constant.CATEGORY.JOKER then
         return card.jokerValue or 0
     end
-    if card.category == Constant.CATEGORY.FACE then
-        return 0  -- J, Q, K = 0点
-    end
-    return card.rank  -- A=1, 2-10=面值
+    -- J=11, Q=12, K=13, A=1, 2-10=面值
+    return card.rank
 end
 
 --- 获取卡牌显示名
