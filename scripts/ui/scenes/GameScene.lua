@@ -17,6 +17,10 @@ local selectedCards = {}     -- 选中的牌索引集合
 local uiRoot = nil           -- 当前 UI 根节点
 local viewingPile = nil      -- 正在查看的牌堆
 
+-- 手牌组件追踪(用于显式清理，避免 Tooltip 脱离 bug)
+local playerHandWidgets = {}
+local aiHandWidgets = {}
+
 -- 结算翻牌动画状态
 local settlementAnim = nil   -- nil=无动画, table=动画进行中
 
@@ -478,6 +482,12 @@ end
 function GameScene._RefreshPlayerHand()
     local panel = uiRoot:FindById("playerHandPanel")
     if not panel then return end
+
+    -- 显式移除旧组件(避免 Tooltip 子组件脱离到根节点)
+    for _, w in ipairs(playerHandWidgets) do
+        if w and w.Remove then w:Remove() end
+    end
+    playerHandWidgets = {}
     panel:ClearChildren()
 
     local hand = GameController.GetPlayerHand()
@@ -488,6 +498,7 @@ function GameScene._RefreshPlayerHand()
     if phase == Constant.PHASE.ROUND_END or phase == Constant.PHASE.GAME_OVER then
         local keepCard = GameController.GetPlayerKeepCard()
         if keepCard then
+            local cardW = CardWidget.Create(keepCard, { skipTooltip = true })
             local wrapper = UI.Panel {
                 alignItems = "center",
                 gap = 6,
@@ -497,10 +508,11 @@ function GameScene._RefreshPlayerHand()
                         fontSize = 12,
                         fontColor = Colors.gold,
                     },
-                    CardWidget.Create(keepCard, {}),
+                    cardW,
                 }
             }
             panel:AddChild(wrapper)
+            table.insert(playerHandWidgets, wrapper)
         end
         return
     end
@@ -520,12 +532,19 @@ function GameScene._RefreshPlayerHand()
             onClick = function() GameScene._ToggleCard(i) end,
         })
         panel:AddChild(widget)
+        table.insert(playerHandWidgets, widget)
     end
 end
 
 function GameScene._RefreshAIHand()
     local panel = uiRoot:FindById("aiHandPanel")
     if not panel then return end
+
+    -- 显式移除旧组件
+    for _, w in ipairs(aiHandWidgets) do
+        if w and w.Remove then w:Remove() end
+    end
+    aiHandWidgets = {}
     panel:ClearChildren()
 
     local hand = GameController.GetAIHand()
@@ -538,6 +557,7 @@ function GameScene._RefreshAIHand()
     for _, card in ipairs(hand) do
         local widget = CardWidget.Create(showCards and card or nil, { isAI = true })
         panel:AddChild(widget)
+        table.insert(aiHandWidgets, widget)
     end
 end
 
@@ -591,7 +611,7 @@ function GameScene._RefreshButtons()
         end
     elseif phase == Constant.PHASE.POST_DISCARD then
         local count = GameScene._CountSelected()
-        actionBtn:SetText(string.format("弃置至牌堆 (%d/2)", count))
+        actionBtn:SetText(string.format("放回抽牌堆 (%d/2)", count))
         actionBtn:SetVisible(true)
         actionBtn:SetDisabled(false)
         if skipBtn then skipBtn:SetText("跳过"); skipBtn:SetVisible(true) end
@@ -640,7 +660,7 @@ function GameScene._GetPhaseText()
     elseif phase == Constant.PHASE.DRAW_THREE then return "第三回合 - 三!"
     elseif phase == Constant.PHASE.JOKER_EFFECT then return "鬼牌效果阶段"
     elseif phase == Constant.PHASE.SETTLEMENT then return "结算"
-    elseif phase == Constant.PHASE.POST_DISCARD then return "二! - 选至多2张弃置至牌堆"
+    elseif phase == Constant.PHASE.POST_DISCARD then return "二! - 选至多2张放回抽牌堆"
     elseif phase == Constant.PHASE.POST_KEEP then return "一! - 选至多1张保留至下局"
     elseif phase == Constant.PHASE.ROUND_END then return "本局结束"
     elseif phase == Constant.PHASE.GAME_OVER then return "游戏结束"
@@ -762,7 +782,7 @@ function GameScene._OnAction()
     if phase == Constant.PHASE.SETTLEMENT then
         GameController.EnterPostGame()
         selectedCards = {}
-        GameScene.SetInfo("选择至多2张牌弃置至你的抽牌堆")
+        GameScene.SetInfo("选择至多2张牌放回你的抽牌堆")
         GameScene.Refresh()
         return
     end

@@ -200,8 +200,9 @@ function CardWidget.Create(card, opts)
     end
 
     -- 有卡牌数据且不是AI的牌时，包裹 Tooltip 显示效果提示
+    local skipTooltip = opts.skipTooltip or false
     local effectText = card and getCardEffectText(card) or nil
-    if effectText and not isAI then
+    if effectText and not isAI and not skipTooltip then
         -- 先创建 Tooltip 容器
         -- delay 不能为 0（Tooltip 内部 timer < delay 条件会恒 false），用极小值模拟即时
         local tooltipWrapper = UI.Tooltip {
