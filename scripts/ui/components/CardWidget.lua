@@ -201,10 +201,84 @@ function CardWidget.Create(card, opts)
             content = effectText,
             position = "top",
             delay = 0.001,
-            fontSize = 32,
-            maxWidth = 600,
+            maxWidth = 700,
             children = { cardPanel },
         }
+
+        -- 重写 RenderTooltip 以强制使用大字号（绕过内置 fontSize 属性不生效的问题）
+        local TOOLTIP_FONT_SIZE = 40  -- 约为默认 12px 的 3.3 倍
+        local TOOLTIP_PADDING = 14
+        local TOOLTIP_RADIUS = 8
+        tooltipWrapper.RenderTooltip = function(self, nvg)
+            local text = self.content_
+            if not text or text == "" then return end
+            local tb = self.triggerBounds_
+            if not tb then return end
+
+            local alpha = self.opacity_
+            if alpha <= 0 then return end
+
+            -- 设置字体
+            nvgFontFace(nvg, "sans")
+            nvgFontSize(nvg, TOOLTIP_FONT_SIZE)
+
+            -- 测量文本宽度
+            local textWidth = nvgTextBounds(nvg, 0, 0, text) or 0
+            if textWidth <= 0 then textWidth = #text * TOOLTIP_FONT_SIZE * 0.5 end
+            textWidth = math.min(textWidth, 700)
+
+            local tooltipW = textWidth + TOOLTIP_PADDING * 2
+            local tooltipH = TOOLTIP_FONT_SIZE + TOOLTIP_PADDING * 2
+
+            -- 定位: 在触发元素上方居中
+            local x = tb.x + tb.w / 2 - tooltipW / 2
+            local y = tb.y - tooltipH - 10
+
+            -- 屏幕边界裁剪
+            local screenW = UI.GetWidth() or 1200
+            local screenH = UI.GetHeight() or 800
+            x = math.max(4, math.min(screenW - tooltipW - 4, x))
+            if y < 4 then y = tb.y + tb.h + 10 end -- 上方放不下就放下方
+
+            -- 绘制阴影
+            nvgBeginPath(nvg)
+            nvgRoundedRect(nvg, x + 1, y + 2, tooltipW, tooltipH, TOOLTIP_RADIUS)
+            nvgFillColor(nvg, nvgRGBA(0, 0, 0, math.floor(60 * alpha)))
+            nvgFill(nvg)
+
+            -- 绘制背景
+            nvgBeginPath(nvg)
+            nvgRoundedRect(nvg, x, y, tooltipW, tooltipH, TOOLTIP_RADIUS)
+            nvgFillColor(nvg, nvgRGBA(30, 30, 30, math.floor(240 * alpha)))
+            nvgFill(nvg)
+
+            -- 绘制箭头（指向下方）
+            local arrowX = tb.x + tb.w / 2
+            local arrowY = y + tooltipH
+            if y > tb.y then -- 如果 tooltip 在下方，箭头指向上方
+                arrowY = y
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, arrowX - 6, arrowY)
+                nvgLineTo(nvg, arrowX, arrowY - 6)
+                nvgLineTo(nvg, arrowX + 6, arrowY)
+                nvgClosePath(nvg)
+            else
+                nvgBeginPath(nvg)
+                nvgMoveTo(nvg, arrowX - 6, arrowY)
+                nvgLineTo(nvg, arrowX, arrowY + 6)
+                nvgLineTo(nvg, arrowX + 6, arrowY)
+                nvgClosePath(nvg)
+            end
+            nvgFillColor(nvg, nvgRGBA(30, 30, 30, math.floor(240 * alpha)))
+            nvgFill(nvg)
+
+            -- 绘制文本
+            nvgFontFace(nvg, "sans")
+            nvgFontSize(nvg, TOOLTIP_FONT_SIZE)
+            nvgFillColor(nvg, nvgRGBA(255, 255, 255, math.floor(255 * alpha)))
+            nvgTextAlign(nvg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+            nvgText(nvg, x + tooltipW / 2, y + tooltipH / 2, text)
+        end
 
         -- 事件注册在 cardPanel 上（指针命中的是 cardPanel，Tooltip 包装后仍 dispatch）
         -- scale 设在 cardPanel（视觉放大），zIndex 设在 tooltipWrapper（在兄弟中提升层级）
