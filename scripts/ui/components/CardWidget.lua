@@ -195,23 +195,28 @@ function CardWidget.Create(card, opts)
     -- 有卡牌数据且不是AI的牌时，包裹 Tooltip 显示效果提示
     local effectText = card and getCardEffectText(card) or nil
     if effectText and not isAI then
+        -- 先创建 Tooltip 容器
+        -- delay 不能为 0（Tooltip 内部 timer < delay 条件会恒 false），用极小值模拟即时
         local tooltipWrapper = UI.Tooltip {
             content = effectText,
             position = "top",
-            delay = 0,
-            fontSize = 28,
+            delay = 0.001,
+            fontSize = 24,
             maxWidth = 500,
-            transition = "scale 0.15s easeOut",
-            transformOrigin = "center",
             children = { cardPanel },
         }
-        -- 悬停放大 + zIndex 提升设在 Tooltip 外层容器上
-        tooltipWrapper:OnEvent("pointerenter", function()
-            tooltipWrapper:SetStyle({ scale = 1.2, zIndex = 100 })
+
+        -- 事件注册在 cardPanel 上（指针命中的是 cardPanel，Tooltip 包装后仍 dispatch）
+        -- scale 设在 cardPanel（视觉放大），zIndex 设在 tooltipWrapper（在兄弟中提升层级）
+        cardPanel:OnEvent("pointerenter", function()
+            cardPanel:SetStyle({ scale = 1.2 })
+            tooltipWrapper:SetStyle({ zIndex = 100 })
         end)
-        tooltipWrapper:OnEvent("pointerleave", function()
-            tooltipWrapper:SetStyle({ scale = 1.0, zIndex = 0 })
+        cardPanel:OnEvent("pointerleave", function()
+            cardPanel:SetStyle({ scale = 1.0 })
+            tooltipWrapper:SetStyle({ zIndex = 0 })
         end)
+
         return tooltipWrapper
     end
 
