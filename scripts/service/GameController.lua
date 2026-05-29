@@ -104,11 +104,18 @@ function GameController.GetTurnIndex()
     return state.round.turnIndex
 end
 
---- 获取弃牌堆
+--- 获取玩家弃牌堆
 ---@return table[]
-function GameController.GetDiscardPile()
+function GameController.GetPlayerDiscardPile()
     if not state then return {} end
-    return state.round.discardPile
+    return state.player.discardPile
+end
+
+--- 获取AI弃牌堆
+---@return table[]
+function GameController.GetAIDiscardPile()
+    if not state then return {} end
+    return state.ai.discardPile
 end
 
 --- 获取玩家抽牌堆
@@ -116,6 +123,13 @@ end
 function GameController.GetPlayerDeck()
     if not state then return {} end
     return state.player.deck
+end
+
+--- 获取AI抽牌堆数量
+---@return number
+function GameController.GetAIDeckCount()
+    if not state then return 0 end
+    return #state.ai.deck
 end
 
 --- 获取 pendingJackPicks 数量
@@ -153,12 +167,15 @@ function GameController.PlayerHasJoker()
     return EffectSystem.HasJoker(state.player.hand)
 end
 
---- 获取弃牌堆/抽牌堆数量
----@return number discardCount
----@return number deckCount
+--- 获取各牌堆数量
+---@return number playerDeckCount
+---@return number playerDiscardCount
+---@return number aiDeckCount
+---@return number aiDiscardCount
 function GameController.GetPileCounts()
-    if not state then return 0, 0 end
-    return state.round:GetDiscardCount(), #state.player.deck
+    if not state then return 0, 0, 0, 0 end
+    return #state.player.deck, state.player:GetDiscardCount(),
+           #state.ai.deck, state.ai:GetDiscardCount()
 end
 
 -- ============================================================================

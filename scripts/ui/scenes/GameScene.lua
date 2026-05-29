@@ -188,167 +188,126 @@ function GameScene._CreateTopBar()
     }
 end
 
---- 创建左侧抽牌堆（叠牌样式）
-function GameScene._CreateDeckPile()
+--- 创建一个叠牌堆视觉组件
+---@param id string
+---@param bgColors table {layer1, layer2, top}
+---@param borderColors table {layer1, layer2, top}
+---@param iconText string
+---@param iconColor table
+---@param onClick function
+local function createStackVisual(id, bgColors, borderColors, iconText, iconColor, onClick)
     return UI.Panel {
-        id = "deckPileArea",
-        width = 90,
-        height = "100%",
-        justifyContent = "center",
-        alignItems = "center",
-        paddingVertical = 20,
+        width = 52,
+        height = 72,
         children = {
-            UI.Label {
-                text = "抽牌堆",
-                fontSize = 11,
-                fontColor = Colors.textDim,
-                marginBottom = 8,
-            },
-            -- 叠牌视觉：多层叠放
             UI.Panel {
-                id = "deckStackPanel",
-                width = 60,
-                height = 84,
-                children = {
-                    -- 第三层（最底）
-                    UI.Panel {
-                        width = 54,
-                        height = 76,
-                        position = "absolute",
-                        top = 6,
-                        left = 6,
-                        backgroundColor = { 50, 55, 80, 200 },
-                        borderRadius = 6,
-                        borderWidth = 1,
-                        borderColor = { 70, 80, 110, 180 },
-                    },
-                    -- 第二层
-                    UI.Panel {
-                        width = 54,
-                        height = 76,
-                        position = "absolute",
-                        top = 3,
-                        left = 3,
-                        backgroundColor = { 60, 65, 95, 220 },
-                        borderRadius = 6,
-                        borderWidth = 1,
-                        borderColor = { 80, 90, 125, 200 },
-                    },
-                    -- 顶层（可点击）
-                    UI.Button {
-                        id = "deckTopCard",
-                        width = 54,
-                        height = 76,
-                        position = "absolute",
-                        top = 0,
-                        left = 0,
-                        backgroundColor = { 70, 80, 120, 255 },
-                        hoverBackgroundColor = { 90, 100, 145, 255 },
-                        borderRadius = 6,
-                        borderWidth = 1,
-                        borderColor = { 100, 110, 150, 220 },
-                        justifyContent = "center",
-                        alignItems = "center",
-                        onClick = function() GameScene._ShowPileView("deck") end,
-                        children = {
-                            UI.Label {
-                                text = "?",
-                                fontSize = 24,
-                                fontColor = { 130, 150, 200, 255 },
-                            },
-                        }
-                    },
-                }
+                width = 46, height = 64,
+                position = "absolute", top = 5, left = 5,
+                backgroundColor = bgColors[1],
+                borderRadius = 5, borderWidth = 1, borderColor = borderColors[1],
             },
-            UI.Label {
-                id = "deckCountLabel",
-                text = "0张",
-                fontSize = 11,
-                fontColor = Colors.textDim,
-                marginTop = 6,
+            UI.Panel {
+                width = 46, height = 64,
+                position = "absolute", top = 2, left = 2,
+                backgroundColor = bgColors[2],
+                borderRadius = 5, borderWidth = 1, borderColor = borderColors[2],
+            },
+            UI.Button {
+                id = id,
+                width = 46, height = 64,
+                position = "absolute", top = 0, left = 0,
+                backgroundColor = bgColors[3],
+                hoverBackgroundColor = bgColors[4] or bgColors[3],
+                borderRadius = 5, borderWidth = 1, borderColor = borderColors[3],
+                justifyContent = "center", alignItems = "center",
+                onClick = onClick,
+                children = {
+                    UI.Label { text = iconText, fontSize = 18, fontColor = iconColor },
+                }
             },
         }
     }
 end
 
---- 创建右侧弃牌堆（叠牌样式）
+--- 创建左侧抽牌堆区域（上:AI抽牌堆, 下:玩家抽牌堆）
+function GameScene._CreateDeckPile()
+    return UI.Panel {
+        id = "deckPileArea",
+        width = 90,
+        height = "100%",
+        justifyContent = "space-around",
+        alignItems = "center",
+        paddingVertical = 12,
+        children = {
+            -- AI 抽牌堆（不可查看内容）
+            UI.Panel {
+                alignItems = "center", gap = 3,
+                children = {
+                    UI.Label { text = "AI牌库", fontSize = 10, fontColor = Colors.textDim },
+                    createStackVisual("aiDeckTop",
+                        { {40,45,65,180}, {50,55,78,200}, {60,68,100,255}, {75,83,120,255} },
+                        { {55,65,90,150}, {65,75,105,180}, {85,95,130,200} },
+                        "?", {100,120,160,255},
+                        function() GameScene._ShowPileInfo("aiDeck") end
+                    ),
+                    UI.Label { id = "aiDeckCountLabel", text = "0", fontSize = 10, fontColor = Colors.textDim },
+                }
+            },
+            -- 玩家抽牌堆（可查看内容）
+            UI.Panel {
+                alignItems = "center", gap = 3,
+                children = {
+                    UI.Label { text = "我的牌库", fontSize = 10, fontColor = { 140, 170, 220, 255 } },
+                    createStackVisual("playerDeckTop",
+                        { {50,55,80,200}, {60,65,95,220}, {70,80,120,255}, {90,100,145,255} },
+                        { {70,80,110,180}, {80,90,125,200}, {100,110,150,220} },
+                        "?", {130,150,200,255},
+                        function() GameScene._ShowPileView("playerDeck") end
+                    ),
+                    UI.Label { id = "playerDeckCountLabel", text = "0", fontSize = 10, fontColor = Colors.textDim },
+                }
+            },
+        }
+    }
+end
+
+--- 创建右侧弃牌堆区域（上:AI弃牌堆, 下:玩家弃牌堆）
 function GameScene._CreateDiscardPile()
     return UI.Panel {
         id = "discardPileArea",
         width = 90,
         height = "100%",
-        justifyContent = "center",
+        justifyContent = "space-around",
         alignItems = "center",
-        paddingVertical = 20,
+        paddingVertical = 12,
         children = {
-            UI.Label {
-                text = "弃牌堆",
-                fontSize = 11,
-                fontColor = Colors.textDim,
-                marginBottom = 8,
-            },
-            -- 叠牌视觉
+            -- AI 弃牌堆（不可查看内容）
             UI.Panel {
-                id = "discardStackPanel",
-                width = 60,
-                height = 84,
+                alignItems = "center", gap = 3,
                 children = {
-                    -- 第三层
-                    UI.Panel {
-                        width = 54,
-                        height = 76,
-                        position = "absolute",
-                        top = 6,
-                        left = 6,
-                        backgroundColor = { 70, 40, 40, 200 },
-                        borderRadius = 6,
-                        borderWidth = 1,
-                        borderColor = { 100, 60, 60, 180 },
-                    },
-                    -- 第二层
-                    UI.Panel {
-                        width = 54,
-                        height = 76,
-                        position = "absolute",
-                        top = 3,
-                        left = 3,
-                        backgroundColor = { 85, 50, 50, 220 },
-                        borderRadius = 6,
-                        borderWidth = 1,
-                        borderColor = { 115, 70, 70, 200 },
-                    },
-                    -- 顶层（可点击）
-                    UI.Button {
-                        id = "discardTopCard",
-                        width = 54,
-                        height = 76,
-                        position = "absolute",
-                        top = 0,
-                        left = 0,
-                        backgroundColor = { 100, 55, 55, 255 },
-                        hoverBackgroundColor = { 130, 70, 70, 255 },
-                        borderRadius = 6,
-                        borderWidth = 1,
-                        borderColor = { 140, 80, 80, 220 },
-                        justifyContent = "center",
-                        alignItems = "center",
-                        onClick = function() GameScene._ShowPileView("discard") end,
-                        children = {
-                            UI.Label {
-                                text = "X",
-                                fontSize = 24,
-                                fontColor = { 200, 130, 130, 255 },
-                            },
-                        }
-                    },
+                    UI.Label { text = "AI弃牌", fontSize = 10, fontColor = Colors.textDim },
+                    createStackVisual("aiDiscardTop",
+                        { {55,35,35,180}, {68,42,42,200}, {80,48,48,255}, {105,60,60,255} },
+                        { {80,50,50,150}, {95,60,60,180}, {115,70,70,200} },
+                        "X", {160,100,100,255},
+                        function() GameScene._ShowPileInfo("aiDiscard") end
+                    ),
+                    UI.Label { id = "aiDiscardCountLabel", text = "0", fontSize = 10, fontColor = Colors.textDim },
                 }
             },
-            UI.Label {
-                id = "discardCountLabel",
-                text = "0张",
-                fontSize = 11,
-                fontColor = Colors.textDim,
-                marginTop = 6,
+            -- 玩家弃牌堆（可查看内容）
+            UI.Panel {
+                alignItems = "center", gap = 3,
+                children = {
+                    UI.Label { text = "我的弃牌", fontSize = 10, fontColor = { 220, 150, 150, 255 } },
+                    createStackVisual("playerDiscardTop",
+                        { {70,40,40,200}, {85,50,50,220}, {100,55,55,255}, {130,70,70,255} },
+                        { {100,60,60,180}, {115,70,70,200}, {140,80,80,220} },
+                        "X", {200,130,130,255},
+                        function() GameScene._ShowPileView("playerDiscard") end
+                    ),
+                    UI.Label { id = "playerDiscardCountLabel", text = "0", fontSize = 10, fontColor = Colors.textDim },
+                }
             },
         }
     }
@@ -626,15 +585,15 @@ function GameScene._RefreshButtons()
 end
 
 function GameScene._RefreshPileCounts()
-    local discardCount, deckCount = GameController.GetPileCounts()
-    local deckLabel = uiRoot:FindById("deckCountLabel")
-    if deckLabel then
-        deckLabel:SetText(string.format("%d张", deckCount))
-    end
-    local discardLabel = uiRoot:FindById("discardCountLabel")
-    if discardLabel then
-        discardLabel:SetText(string.format("%d张", discardCount))
-    end
+    local playerDeck, playerDiscard, aiDeck, aiDiscard = GameController.GetPileCounts()
+    local pdLabel = uiRoot:FindById("playerDeckCountLabel")
+    if pdLabel then pdLabel:SetText(string.format("%d张", playerDeck)) end
+    local pdcLabel = uiRoot:FindById("playerDiscardCountLabel")
+    if pdcLabel then pdcLabel:SetText(string.format("%d张", playerDiscard)) end
+    local adLabel = uiRoot:FindById("aiDeckCountLabel")
+    if adLabel then adLabel:SetText(string.format("%d张", aiDeck)) end
+    local adcLabel = uiRoot:FindById("aiDiscardCountLabel")
+    if adcLabel then adcLabel:SetText(string.format("%d张", aiDiscard)) end
 end
 
 function GameScene._GetPhaseText()
@@ -919,30 +878,54 @@ end
 -- 内部: 牌堆查看弹窗
 -- ============================================================================
 
+--- 对牌进行排序: 鬼牌在前, 然后按rank降序排列
+---@param pile table[]
+---@return table[]
+local function sortPile(pile)
+    local sorted = {}
+    for _, c in ipairs(pile) do table.insert(sorted, c) end
+    table.sort(sorted, function(a, b)
+        -- 鬼牌排在最前面
+        local aJoker = Card.IsJoker(a) and 1 or 0
+        local bJoker = Card.IsJoker(b) and 1 or 0
+        if aJoker ~= bJoker then return aJoker > bJoker end
+        -- rank 降序（A=1 视为14排在最前）
+        local aRank = a.rank == 1 and 14 or a.rank
+        local bRank = b.rank == 1 and 14 or b.rank
+        if aRank ~= bRank then return aRank > bRank end
+        -- 同rank按suit排序
+        return (a.suit or "") < (b.suit or "")
+    end)
+    return sorted
+end
+
 function GameScene._ShowPileView(pileType)
     viewingPile = pileType
 
     local pile, title
-    if pileType == "discard" then
-        pile = GameController.GetDiscardPile()
-        title = "弃牌堆"
-    elseif pileType == "deck" then
+    if pileType == "playerDiscard" then
+        pile = GameController.GetPlayerDiscardPile()
+        title = "我的弃牌堆"
+    elseif pileType == "playerDeck" then
         pile = GameController.GetPlayerDeck()
-        title = "抽牌堆"
+        title = "我的抽牌堆"
     else
         return
     end
 
+    -- 排序
+    local sortedPile = sortPile(pile)
+
     local cardWidgets = {}
-    if #pile == 0 then
+    if #sortedPile == 0 then
         table.insert(cardWidgets, UI.Label {
             text = "（空）",
             fontSize = 14,
             fontColor = Colors.textDim,
         })
     else
-        for _, card in ipairs(pile) do
-            table.insert(cardWidgets, CardWidget.Create(card, {}))
+        for _, card in ipairs(sortedPile) do
+            table.insert(cardWidgets, CardWidget.Create(card, { small = true }))
         end
     end
 
@@ -973,7 +956,7 @@ function GameScene._ShowPileView(pileType)
                         alignItems = "center",
                         children = {
                             UI.Label {
-                                text = title .. string.format(" (%d张)", #pile),
+                                text = title .. string.format(" (%d张)", #sortedPile),
                                 fontSize = 16,
                                 fontColor = Colors.gold,
                             },
@@ -1020,12 +1003,28 @@ function GameScene._ClosePileView()
     if overlay then overlay:Remove() end
 end
 
+--- 显示AI牌堆信息（只显示数量，不显示内容）
+function GameScene._ShowPileInfo(pileType)
+    local count, title
+    if pileType == "aiDeck" then
+        count = GameController.GetAIDeckCount()
+        title = "AI 抽牌堆"
+    elseif pileType == "aiDiscard" then
+        local _, _, _, aiDiscard = GameController.GetPileCounts()
+        count = aiDiscard
+        title = "AI 弃牌堆"
+    else
+        return
+    end
+    GameScene.SetInfo(string.format("%s: %d 张牌", title, count))
+end
+
 -- ============================================================================
 -- 内部: J效果弹窗
 -- ============================================================================
 
 function GameScene._ShowJackPickUI()
-    local discardCount, deckCount = GameController.GetPileCounts()
+    local playerDeck, playerDiscard = GameController.GetPileCounts()
     local remaining = GameController.GetPendingJackPicks()
 
     local overlay = UI.Panel {
@@ -1053,29 +1052,29 @@ function GameScene._ShowJackPickUI()
                         fontColor = Colors.jokerPurple,
                     },
                     UI.Label {
-                        text = string.format("选择一个牌堆随机抽取一张牌\n(剩余 %d 次)", remaining),
+                        text = string.format("从你的牌堆中随机抽取一张牌\n(剩余 %d 次)", remaining),
                         fontSize = 13,
                         fontColor = Colors.textDim,
                         textAlign = "center",
                     },
                     UI.Button {
-                        text = string.format("从弃牌堆抽 (%d张)", discardCount),
+                        text = string.format("从我的弃牌堆抽 (%d张)", playerDiscard),
                         width = "100%",
                         height = 44,
                         fontSize = 14,
                         backgroundColor = { 100, 45, 45, 220 },
                         borderRadius = 8,
-                        disabled = discardCount == 0,
+                        disabled = playerDiscard == 0,
                         onClick = function() GameScene._OnJackPick("discard") end,
                     },
                     UI.Button {
-                        text = string.format("从抽牌堆抽 (%d张)", deckCount),
+                        text = string.format("从我的抽牌堆抽 (%d张)", playerDeck),
                         width = "100%",
                         height = 44,
                         fontSize = 14,
                         backgroundColor = { 45, 45, 100, 220 },
                         borderRadius = 8,
-                        disabled = deckCount == 0,
+                        disabled = playerDeck == 0,
                         onClick = function() GameScene._OnJackPick("deck") end,
                     },
                 }

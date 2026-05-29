@@ -93,9 +93,10 @@ function CardWidget.Create(card, opts)
     local isSelected = opts.selected or false
     local selectable = opts.selectable or false
     local isAI = opts.isAI or false
+    local isSmall = opts.small or false
 
-    local w = isAI and AI_CARD_WIDTH or CARD_WIDTH
-    local h = isAI and AI_CARD_HEIGHT or CARD_HEIGHT
+    local w = isAI and AI_CARD_WIDTH or (isSmall and 150 or CARD_WIDTH)
+    local h = isAI and AI_CARD_HEIGHT or (isSmall and 210 or CARD_HEIGHT)
 
     local bgColor = isSelected and COLORS.cardSelected or COLORS.cardBg
     local hoverBg = isSelected and { 160, 210, 255, 255 } or COLORS.cardHover
@@ -103,8 +104,8 @@ function CardWidget.Create(card, opts)
     local hoverBorderColor = isSelected and { 60, 140, 255, 255 } or { 120, 150, 200, 200 }
     local borderWidth = isSelected and 2 or 1
 
-    local rankFontSize = isAI and 28 or 54
-    local suitFontSize = isAI and 44 or 84
+    local rankFontSize = isAI and 28 or (isSmall and 38 or 54)
+    local suitFontSize = isAI and 44 or (isSmall and 60 or 84)
 
     -- 卡牌光晕 (加大范围使其更醒目)
     local glowColor, glowBaseBlur = getGlowColor(card)

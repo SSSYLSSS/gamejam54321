@@ -108,9 +108,9 @@ function PhaseManager.PlayerDiscard(gameState, discardIndices)
         end
     end
 
-    -- 弃牌放入弃牌堆
+    -- 弃牌放入玩家自己的弃牌堆
     for _, card in ipairs(discarded) do
-        round:AddToDiscardPile(card)
+        player:AddToDiscard(card)
     end
 
     -- 记录J待处理 + 追踪J弃牌数
@@ -174,9 +174,9 @@ function PhaseManager.AITurn(gameState)
         end
     end
 
-    -- 弃牌放入弃牌堆
+    -- 弃牌放入AI自己的弃牌堆
     for _, card in ipairs(discarded) do
-        round:AddToDiscardPile(card)
+        ai:AddToDiscard(card)
     end
 
     -- J 效果 + 追踪J弃牌数
@@ -257,14 +257,13 @@ end
 ---@param discardIndices number[]
 function PhaseManager.PlayerPostDiscard(gameState, discardIndices)
     local player = gameState.player
-    local round = gameState.round
 
-    -- 强制弃置鬼牌
+    -- 强制弃置鬼牌到自己的弃牌堆
     local i = 1
     while i <= #player.hand do
         if Card.IsJoker(player.hand[i]) then
             local card = table.remove(player.hand, i)
-            round:AddToDiscardPile(card)
+            player:AddToDiscard(card)
             gameState:AddLog("强制弃置鬼牌: " .. Card.GetName(card))
         else
             i = i + 1
@@ -289,7 +288,6 @@ end
 ---@param keepIndex number|nil
 function PhaseManager.PlayerPostKeep(gameState, keepIndex)
     local player = gameState.player
-    local round = gameState.round
 
     if keepIndex and keepIndex >= 1 and keepIndex <= #player.hand then
         local card = table.remove(player.hand, keepIndex)
@@ -297,9 +295,9 @@ function PhaseManager.PlayerPostKeep(gameState, keepIndex)
         gameState:AddLog("保留至下局: " .. Card.GetName(card))
     end
 
-    -- 剩余手牌放入弃牌堆
+    -- 剩余手牌放入自己的弃牌堆
     for _, card in ipairs(player.hand) do
-        round:AddToDiscardPile(card)
+        player:AddToDiscard(card)
     end
     player.hand = {}
 end
@@ -308,14 +306,13 @@ end
 ---@param gameState table GameState
 function PhaseManager.AIPostGame(gameState)
     local ai = gameState.ai
-    local round = gameState.round
 
-    -- 强制弃置鬼牌
+    -- 强制弃置鬼牌到AI自己的弃牌堆
     local i = 1
     while i <= #ai.hand do
         if Card.IsJoker(ai.hand[i]) then
             local card = table.remove(ai.hand, i)
-            round:AddToDiscardPile(card)
+            ai:AddToDiscard(card)
         else
             i = i + 1
         end
@@ -343,9 +340,9 @@ function PhaseManager.AIPostGame(gameState)
         end
     end
 
-    -- 剩余放入弃牌堆
+    -- 剩余放入AI自己的弃牌堆
     for _, card in ipairs(ai.hand) do
-        round:AddToDiscardPile(card)
+        ai:AddToDiscard(card)
     end
     ai.hand = {}
 end

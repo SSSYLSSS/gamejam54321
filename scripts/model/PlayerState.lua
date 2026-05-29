@@ -13,6 +13,7 @@ function PlayerState.New(isAI)
     self.isAI = isAI or false
     self.hand = {}              -- 当前手牌
     self.deck = {}              -- 抽牌堆(各自独立)
+    self.discardPile = {}       -- 弃牌堆(各自独立)
     self.keepCard = nil         -- 保留到下一局的牌
     self.pendingJackPicks = 0   -- J效果待处理次数
     self.discardedTenCount = 0  -- 本局弃置的10的数量(用于10的+1效果)
@@ -54,6 +55,26 @@ end
 ---@param card table
 function PlayerState:AddToDeck(card)
     table.insert(self.deck, card)
+end
+
+--- 添加牌到弃牌堆
+---@param card table
+function PlayerState:AddToDiscard(card)
+    table.insert(self.discardPile, card)
+end
+
+--- 从弃牌堆随机取一张
+---@return table|nil
+function PlayerState:DrawRandomFromDiscard()
+    if #self.discardPile == 0 then return nil end
+    local idx = math.random(1, #self.discardPile)
+    return table.remove(self.discardPile, idx)
+end
+
+--- 获取弃牌堆数量
+---@return number
+function PlayerState:GetDiscardCount()
+    return #self.discardPile
 end
 
 --- 设置保留牌
