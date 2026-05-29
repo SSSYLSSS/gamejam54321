@@ -153,9 +153,11 @@ function GameLogic.DrawFromDeck(deck, discardPile)
 end
 
 --- 玩家执行弃牌换牌操作
+--- 当弃置J时，返回特殊状态等待玩家选择从哪里抽牌
 ---@param state table 游戏状态
 ---@param discardIndices number[] 要弃置的手牌索引数组(1-based)
----@return boolean, string 是否成功, 错误信息
+---@return boolean success
+---@return string|nil errMsg
 function GameLogic.PlayerDiscard(state, discardIndices)
     local maxDiscard = GameLogic.MAX_DISCARD[state.turnIndex]
     
@@ -175,37 +177,27 @@ function GameLogic.PlayerDiscard(state, discardIndices)
     table.sort(discardIndices, function(a, b) return a > b end)
     
     local discarded = {}
+    local jackCount = 0
     for _, idx in ipairs(discardIndices) do
         if idx >= 1 and idx <= #state.playerHand then
             local card = table.remove(state.playerHand, idx)
             table.insert(discarded, card)
-            -- J的弃置效果: 从弃牌堆抽一张
             if card.rank == 11 then
-                GameLogic.AddLog(state, "J 弃置效果: 从弃牌堆抽取一张牌")
-                if #state.discardPile > 0 then
-                    local drawnCard = table.remove(state.discardPile, math.random(1, #state.discardPile))
-                    table.insert(state.playerHand, drawnCard)
-                    GameLogic.AddLog(state, "  抽到: " .. CardDefs.GetCardName(drawnCard))
-                end
+                jackCount = jackCount + 1
             end
         end
     end
     
-    -- 弃置的牌放入弃牌堆(J效果已在上面处理)
+    -- 弃置的牌放入弃牌堆
     for _, card in ipairs(discarded) do
-        if card.rank ~= 11 then -- J已触发效果，也放入弃牌堆
-            table.insert(state.discardPile, card)
-        else
-            table.insert(state.discardPile, card)
-        end
+        table.insert(state.discardPile, card)
     end
     
-    -- 抽取相同张数的新牌
+    -- 记录待处理的J数量(玩家需要选择从弃牌堆还是抽牌堆抽牌)
+    state.pendingJackPicks = jackCount
+    
+    -- 抽取相同张数的新牌(不含J的额外抽取)
     local drawCount = #discarded
-    -- J效果可能已经抽了牌，需要减去
-    -- 实际需要补的牌数 = 原弃置数 - J额外抽的牌数 (不对,J抽牌是额外的)
-    -- 重新理解: 弃N张 → 抽N张; J弃置时额外从弃牌堆抽1张
-    -- 但是J抽的牌已经加入手牌了，所以这里抽牌数 = 原始弃置张数(不含J额外)
     for _ = 1, drawCount do
         local card = GameLogic.DrawFromDeck(state.playerDeck, state.discardPile)
         if card then
@@ -214,6 +206,48 @@ function GameLogic.PlayerDiscard(state, discardIndices)
     end
     
     GameLogic.AddLog(state, string.format("弃置 %d 张, 抽取 %d 张", #discarded, drawCount))
+    
+    if jackCount > 0 then
+        GameLogic.AddLog(state, string.format("J 弃置效果: 可从弃牌堆或抽牌堆中选取 %d 张牌", jackCount))
+    end
+    
+    return true, nil
+end
+
+--- 玩家J效果: 从指定牌堆中选取一张指定的牌
+---@param state table
+---@param source string "discard" 或 "deck"
+---@param cardIndex number 在该牌堆中的索引
+---@return boolean, string
+function GameLogic.PlayerJackPick(state, source, cardIndex)
+    if not state.pendingJackPicks or state.pendingJackPicks <= 0 then
+        return false, "没有待处理的J效果"
+    end
+    
+    local pile
+    if source == "discard" then
+        pile = state.discardPile
+    elseif source == "deck" then
+        pile = state.playerDeck
+    else
+        return false, "无效来源"
+    end
+    
+    if #pile == 0 then
+        return false, "该牌堆为空"
+    end
+    
+    if cardIndex < 1 or cardIndex > #pile then
+        return false, "无效索引"
+    end
+    
+    local card = table.remove(pile, cardIndex)
+    table.insert(state.playerHand, card)
+    state.pendingJackPicks = state.pendingJackPicks - 1
+    
+    GameLogic.AddLog(state, string.format("J效果: 从%s中抽取了 %s",
+        source == "discard" and "弃牌堆" or "抽牌堆",
+        CardDefs.GetCardName(card)))
     
     return true, nil
 end

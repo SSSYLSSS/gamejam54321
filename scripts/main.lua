@@ -31,9 +31,12 @@ local audioSettings = {
 }
 
 -- 游戏子阶段
-local subPhase = "player_turn"  -- player_turn / ai_turn / waiting
+local subPhase = "player_turn"  -- player_turn / ai_turn / waiting / jack_pick
 local postPhase = "discard"     -- discard / keep (结算后子阶段)
 local jokerPhase = "pending"    -- pending / small_joker_pick / big_joker_pick / done
+
+-- 牌堆查看状态
+local viewingPile = nil         -- nil / "discard" / "deck" / "jack_discard" / "jack_deck"
 
 -- ============================================================================
 -- 颜色定义
@@ -580,25 +583,60 @@ function CreateBottomBar()
         height = 60,
         flexDirection = "row",
         alignItems = "center",
-        justifyContent = "center",
-        gap = 12,
+        justifyContent = "space-between",
         paddingHorizontal = 20,
         backgroundColor = COLORS.panel,
         borderColor = { 60, 75, 100, 100 },
         borderWidth = { 1, 0, 0, 0 },
         children = {
-            UI.Button {
-                id = "actionBtn",
-                text = "确认",
-                variant = "primary",
-                onClick = function() OnActionButton() end,
+            -- 左侧: 牌堆查看按钮
+            UI.Panel {
+                flexDirection = "row",
+                gap = 8,
+                alignItems = "center",
+                children = {
+                    UI.Button {
+                        id = "viewDiscardBtn",
+                        text = "弃牌堆",
+                        fontSize = 12,
+                        height = 34,
+                        backgroundColor = { 80, 50, 50, 200 },
+                        borderRadius = 6,
+                        onClick = function() ShowPileView("discard") end,
+                    },
+                    UI.Button {
+                        id = "viewDeckBtn",
+                        text = "抽牌堆",
+                        fontSize = 12,
+                        height = 34,
+                        backgroundColor = { 50, 50, 80, 200 },
+                        borderRadius = 6,
+                        onClick = function() ShowPileView("deck") end,
+                    },
+                }
             },
-            UI.Button {
-                id = "skipBtn",
-                text = "跳过",
-                visible = false,
-                onClick = function() OnSkipButton() end,
+            -- 中间: 操作按钮
+            UI.Panel {
+                flexDirection = "row",
+                gap = 12,
+                alignItems = "center",
+                children = {
+                    UI.Button {
+                        id = "actionBtn",
+                        text = "确认",
+                        variant = "primary",
+                        onClick = function() OnActionButton() end,
+                    },
+                    UI.Button {
+                        id = "skipBtn",
+                        text = "跳过",
+                        visible = false,
+                        onClick = function() OnSkipButton() end,
+                    },
+                }
             },
+            -- 右侧占位(保持居中)
+            UI.Panel { width = 120 },
         }
     }
 end
@@ -917,8 +955,16 @@ function OnActionButton()
             return
         end
         selectedCards = {}
-        subPhase = "ai_turn"
         RefreshUI()
+        
+        -- 检查是否有J待处理(玩家选牌)
+        if gameState.pendingJackPicks and gameState.pendingJackPicks > 0 then
+            ShowJackPickUI()
+            return
+        end
+        
+        -- 没有J效果，直接进入AI回合
+        subPhase = "ai_turn"
         
         local aiIndices = AIPlayer.DecideDiscard(gameState.aiHand, gameState.turnIndex)
         GameLogic.AIDiscard(gameState, aiIndices)
@@ -1221,6 +1267,319 @@ function DoSettlement()
 end
 
 -- ============================================================================
+-- 牌堆查看 / J效果选牌 UI
+-- ============================================================================
+
+--- 显示牌堆查看弹窗
+---@param pileType string "discard" 或 "deck"
+function ShowPileView(pileType)
+    if not gameState then return end
+    viewingPile = pileType
+    
+    local pile
+    local title
+    if pileType == "discard" then
+        pile = gameState.discardPile
+        title = "弃牌堆"
+    elseif pileType == "deck" then
+        pile = gameState.playerDeck
+        title = "抽牌堆"
+    else
+        return
+    end
+    
+    local cardWidgets = {}
+    if #pile == 0 then
+        table.insert(cardWidgets, UI.Label {
+            text = "（空）",
+            fontSize = 14,
+            fontColor = COLORS.textDim,
+        })
+    else
+        for i, card in ipairs(pile) do
+            table.insert(cardWidgets, CreateCardWidget(card, i, false, false))
+        end
+    end
+    
+    -- 创建弹窗覆盖层
+    local overlay = UI.Panel {
+        id = "pileOverlay",
+        width = "100%",
+        height = "100%",
+        position = "absolute",
+        backgroundColor = { 0, 0, 0, 180 },
+        justifyContent = "center",
+        alignItems = "center",
+        children = {
+            UI.Panel {
+                width = "85%",
+                maxHeight = "75%",
+                backgroundColor = COLORS.menuCard,
+                borderRadius = 12,
+                borderWidth = 1,
+                borderColor = COLORS.menuBorder,
+                padding = 20,
+                gap = 12,
+                alignItems = "center",
+                children = {
+                    -- 标题行
+                    UI.Panel {
+                        width = "100%",
+                        flexDirection = "row",
+                        justifyContent = "space-between",
+                        alignItems = "center",
+                        children = {
+                            UI.Label {
+                                text = title .. string.format(" (%d张)", #pile),
+                                fontSize = 16,
+                                fontColor = COLORS.gold,
+                            },
+                            UI.Button {
+                                text = "关闭",
+                                fontSize = 12,
+                                height = 30,
+                                onClick = function() ClosePileView() end,
+                            },
+                        }
+                    },
+                    -- 分隔线
+                    UI.Panel {
+                        width = "100%",
+                        height = 1,
+                        backgroundColor = COLORS.menuBorder,
+                    },
+                    -- 牌列表
+                    UI.ScrollView {
+                        width = "100%",
+                        flexGrow = 1,
+                        flexBasis = 0,
+                        children = {
+                            UI.Panel {
+                                id = "pileCards",
+                                width = "100%",
+                                flexDirection = "row",
+                                flexWrap = "wrap",
+                                gap = 6,
+                                justifyContent = "center",
+                                padding = 8,
+                                children = cardWidgets,
+                            }
+                        }
+                    },
+                }
+            },
+        }
+    }
+    
+    uiRoot:AddChild(overlay)
+end
+
+--- 关闭牌堆查看弹窗
+function ClosePileView()
+    viewingPile = nil
+    local overlay = uiRoot:FindById("pileOverlay")
+    if overlay then
+        overlay:Remove()
+    end
+end
+
+--- 显示J效果选牌弹窗(从弃牌堆或抽牌堆选一张)
+function ShowJackPickUI()
+    subPhase = "jack_pick"
+    
+    local discardPile = gameState.discardPile
+    local deckPile = gameState.playerDeck
+    local remaining = gameState.pendingJackPicks or 0
+    
+    -- 弃牌堆的牌(可选)
+    local discardWidgets = {}
+    if #discardPile == 0 then
+        table.insert(discardWidgets, UI.Label {
+            text = "（空）",
+            fontSize = 12,
+            fontColor = COLORS.textDim,
+        })
+    else
+        for i, card in ipairs(discardPile) do
+            local idx = i
+            local w = CreateCardWidget(card, i, false, true)
+            w:OnEvent("click", function()
+                OnJackPickCard("discard", idx)
+            end)
+            table.insert(discardWidgets, w)
+        end
+    end
+    
+    -- 抽牌堆的牌(可选)
+    local deckWidgets = {}
+    if #deckPile == 0 then
+        table.insert(deckWidgets, UI.Label {
+            text = "（空）",
+            fontSize = 12,
+            fontColor = COLORS.textDim,
+        })
+    else
+        for i, card in ipairs(deckPile) do
+            local idx = i
+            local w = CreateCardWidget(card, i, false, true)
+            w:OnEvent("click", function()
+                OnJackPickCard("deck", idx)
+            end)
+            table.insert(deckWidgets, w)
+        end
+    end
+    
+    local overlay = UI.Panel {
+        id = "jackPickOverlay",
+        width = "100%",
+        height = "100%",
+        position = "absolute",
+        backgroundColor = { 0, 0, 0, 200 },
+        justifyContent = "center",
+        alignItems = "center",
+        children = {
+            UI.Panel {
+                width = "90%",
+                maxHeight = "85%",
+                backgroundColor = COLORS.menuCard,
+                borderRadius = 12,
+                borderWidth = 1,
+                borderColor = { 150, 80, 200, 150 },
+                padding = 16,
+                gap = 10,
+                alignItems = "center",
+                children = {
+                    -- 标题
+                    UI.Label {
+                        text = string.format("J 效果: 选择一张牌加入手牌 (剩余%d次)", remaining),
+                        fontSize = 15,
+                        fontColor = COLORS.jokerPurple,
+                        textAlign = "center",
+                    },
+                    -- 弃牌堆区域
+                    UI.Panel {
+                        width = "100%",
+                        gap = 6,
+                        children = {
+                            UI.Label {
+                                text = string.format("弃牌堆 (%d张) - 点击选取", #discardPile),
+                                fontSize = 13,
+                                fontColor = COLORS.danger,
+                            },
+                            UI.ScrollView {
+                                width = "100%",
+                                height = 90,
+                                children = {
+                                    UI.Panel {
+                                        flexDirection = "row",
+                                        flexWrap = "wrap",
+                                        gap = 5,
+                                        padding = 4,
+                                        children = discardWidgets,
+                                    }
+                                }
+                            },
+                        }
+                    },
+                    -- 分隔线
+                    UI.Panel {
+                        width = "100%",
+                        height = 1,
+                        backgroundColor = COLORS.menuBorder,
+                    },
+                    -- 抽牌堆区域
+                    UI.Panel {
+                        width = "100%",
+                        gap = 6,
+                        children = {
+                            UI.Label {
+                                text = string.format("抽牌堆 (%d张) - 点击选取", #deckPile),
+                                fontSize = 13,
+                                fontColor = COLORS.accent,
+                            },
+                            UI.ScrollView {
+                                width = "100%",
+                                height = 90,
+                                children = {
+                                    UI.Panel {
+                                        flexDirection = "row",
+                                        flexWrap = "wrap",
+                                        gap = 5,
+                                        padding = 4,
+                                        children = deckWidgets,
+                                    }
+                                }
+                            },
+                        }
+                    },
+                    -- 跳过按钮
+                    UI.Button {
+                        text = "跳过(不抽牌)",
+                        fontSize = 12,
+                        height = 34,
+                        marginTop = 4,
+                        onClick = function() OnJackPickSkip() end,
+                    },
+                }
+            },
+        }
+    }
+    
+    uiRoot:AddChild(overlay)
+end
+
+--- J效果: 玩家选了一张牌
+function OnJackPickCard(source, cardIndex)
+    local success, err = GameLogic.PlayerJackPick(gameState, source, cardIndex)
+    if not success then
+        UpdateInfoLabel(err or "选取失败")
+        return
+    end
+    
+    -- 关闭弹窗
+    local overlay = uiRoot:FindById("jackPickOverlay")
+    if overlay then overlay:Remove() end
+    
+    -- 还有J待处理?
+    if gameState.pendingJackPicks and gameState.pendingJackPicks > 0 then
+        RefreshUI()
+        ShowJackPickUI()
+    else
+        -- J效果全部处理完毕，继续AI回合
+        subPhase = "ai_turn"
+        FinishPlayerTurnAfterJack()
+    end
+end
+
+--- J效果: 跳过
+function OnJackPickSkip()
+    gameState.pendingJackPicks = 0
+    
+    local overlay = uiRoot:FindById("jackPickOverlay")
+    if overlay then overlay:Remove() end
+    
+    subPhase = "ai_turn"
+    FinishPlayerTurnAfterJack()
+end
+
+--- J效果处理完后继续游戏流程
+function FinishPlayerTurnAfterJack()
+    local aiIndices = AIPlayer.DecideDiscard(gameState.aiHand, gameState.turnIndex)
+    GameLogic.AIDiscard(gameState, aiIndices)
+    
+    GameLogic.NextTurn(gameState)
+    subPhase = "player_turn"
+    
+    if gameState.phase == GameLogic.PHASE.JOKER_EFFECT then
+        HandleJokerPhase()
+    else
+        UpdateInfoLabel(string.format("选择要弃置的牌（至多%d张），或跳过",
+            GameLogic.MAX_DISCARD[gameState.turnIndex]))
+    end
+    RefreshUI()
+end
+
+-- ============================================================================
 -- 事件处理
 -- ============================================================================
 
@@ -1234,6 +1593,16 @@ end
 function HandleKeyDown(eventType, eventData)
     local key = eventData["Key"]:GetInt()
     if key == KEY_ESCAPE then
+        -- 先关闭弹窗
+        if viewingPile then
+            ClosePileView()
+            return
+        end
+        local jackOverlay = uiRoot and uiRoot:FindById("jackPickOverlay")
+        if jackOverlay then
+            return -- J选牌时不允许ESC退出
+        end
+        
         if currentScene == "game" then
             ShowMainMenu()
         elseif currentScene == "settings" then
