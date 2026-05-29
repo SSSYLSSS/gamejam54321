@@ -387,7 +387,7 @@ function GameScene._RefreshAIHand()
                       phase == Constant.PHASE.ROUND_END)
 
     for _, card in ipairs(hand) do
-        local widget = CardWidget.Create(showCards and card or nil, {})
+        local widget = CardWidget.Create(showCards and card or nil, { isAI = true })
         panel:AddChild(widget)
     end
 end
