@@ -926,26 +926,7 @@ end
 function GameScene._ShowSettlementResult(result)
     if not result then return end
 
-    -- 三7特殊规则: 直接显示结果(无需逐张翻牌)
-    if result.sevenRuleTriggered then
-        local sw = graphics:GetWidth() / graphics:GetDPR()
-        local sh = graphics:GetHeight() / graphics:GetDPR()
-        local cx, cy = sw * 0.5, sh * 0.5
-        local text = "三7特殊规则触发! "
-        if result.winner == "player" then
-            text = text .. "你赢了!"
-            VFXManager.EmitWinParticles(cx, cy)
-        elseif result.winner == "ai" then
-            text = text .. "AI赢了!"
-            VFXManager.EmitLoseParticles(cx, cy)
-        else
-            text = text .. "平局!"
-        end
-        GameScene.SetInfo(text)
-        return
-    end
-
-    -- 启动逐张翻牌动画
+    -- 启动逐张翻牌动画(包括三7特殊规则也走翻牌流程)
     local aiHand = GameController.GetAIHand()
     local playerHand = GameController.GetPlayerHand()
     settlementAnim = {
@@ -1068,6 +1049,14 @@ function GameScene._BuildSettlementContent()
     -- 结果文字(全部翻开后显示)
     local resultChildren = {}
     if allRevealed then
+        -- 三7特殊规则提示
+        if anim.result.sevenRuleTriggered then
+            table.insert(resultChildren, UI.Label {
+                text = "三7特殊规则触发!",
+                fontSize = 14,
+                fontColor = { 255, 200, 50, 255 },
+            })
+        end
         local resultText = ""
         local resultColor = Colors.textDim
         if anim.result.winner == "player" then
