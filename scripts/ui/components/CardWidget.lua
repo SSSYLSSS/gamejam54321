@@ -201,8 +201,8 @@ function CardWidget.Create(card, opts)
             content = effectText,
             position = "top",
             delay = 0.001,
-            fontSize = 24,
-            maxWidth = 500,
+            fontSize = 32,
+            maxWidth = 600,
             children = { cardPanel },
         }
 
