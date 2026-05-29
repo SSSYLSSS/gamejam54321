@@ -44,17 +44,10 @@ local function Setup3DScene()
     local camera = cameraNode_:CreateComponent("Camera")
     camera.farClip = 100
 
-    -- 加载 LightGroup 获取 Zone (用于 Vignette 后处理)
+    -- 加载 LightGroup 提供基础 Zone (不开启 Vignette, 由 NanoVG 层模拟暗角)
     local lightGroupFile = cache:GetResource("XMLFile", "LightGroup/DarkNight.xml")
     local lightGroup = scene_:CreateChild("LightGroup")
     lightGroup:LoadXML(lightGroupFile:GetRoot())
-
-    -- 获取 Zone 开启暗角
-    local zone = lightGroup:GetComponent("Zone", true)
-    if zone then
-        zone.vignetteEnabled = true
-        zone.vignetteIntensity = VFXConfig.VIGNETTE_INTENSITY
-    end
 
     -- 设置视口
     local viewport = Viewport:new(scene_, camera)

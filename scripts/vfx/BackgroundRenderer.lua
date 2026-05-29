@@ -101,7 +101,20 @@ function BackgroundRenderer:Render(ctx, width, height)
         nvgFill(ctx)
     end
 
-    -- 3. 星星 (带闪烁)
+    -- 3. 暗角 (NanoVG 模拟 Vignette)
+    local cx, cy = width * 0.5, height * 0.5
+    local maxR = math.sqrt(cx * cx + cy * cy)
+    local innerR = maxR * 0.45
+
+    nvgBeginPath(ctx)
+    nvgRect(ctx, 0, 0, width, height)
+    local vigGrad = nvgRadialGradient(ctx, cx, cy, innerR, maxR,
+        nvgRGBAf(0, 0, 0, 0),
+        nvgRGBAf(0, 0, 0, 0.6))
+    nvgFillPaint(ctx, vigGrad)
+    nvgFill(ctx)
+
+    -- 4. 星星 (带闪烁)
     for _, star in ipairs(self.stars) do
         local twinkle = 0.5 + 0.5 * math.sin(self.time * star.twinkleSpeed + star.twinkleOffset)
         local alpha = star.brightness * twinkle * 0.8
