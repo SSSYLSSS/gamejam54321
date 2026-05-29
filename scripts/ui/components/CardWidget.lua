@@ -68,19 +68,19 @@ end
 local function getGlowColor(card)
     if not card then return nil, 0 end
     -- 鬼牌: 暗金色, 最大光晕
-    if Card.IsJoker(card) then return { 180, 150, 50, 220 }, 60 end
+    if Card.IsJoker(card) then return { 180, 150, 50, 220 }, 120 end
     -- A: 金色, 第二大光晕
-    if card.rank == 1 then return { 255, 210, 60, 200 }, 50 end
+    if card.rank == 1 then return { 255, 210, 60, 200 }, 100 end
     -- J~K: 紫色, 第三大光晕
-    if card.rank == 11 then return { 160, 80, 255, 220 }, 44 end
-    if card.rank == 12 then return { 160, 80, 255, 220 }, 44 end
-    if card.rank == 13 then return { 160, 80, 255, 220 }, 44 end
-    -- 8~10: 蓝色, 基础光晕
-    if card.rank == 8 then return { 100, 180, 255, 180 }, 40 end
-    if card.rank == 9 then return { 100, 180, 255, 180 }, 40 end
-    if card.rank == 10 then return { 100, 180, 255, 180 }, 40 end
-    -- 7: 绿色（保留）
-    if card.rank == 7 then return { 60, 255, 120, 200 }, 40 end
+    if card.rank == 11 then return { 160, 80, 255, 220 }, 70 end
+    if card.rank == 12 then return { 160, 80, 255, 220 }, 70 end
+    if card.rank == 13 then return { 160, 80, 255, 220 }, 70 end
+    -- 8~10: 蓝色
+    if card.rank == 8 then return { 100, 180, 255, 180 }, 50 end
+    if card.rank == 9 then return { 100, 180, 255, 180 }, 50 end
+    if card.rank == 10 then return { 100, 180, 255, 180 }, 50 end
+    -- 7: 绿色
+    if card.rank == 7 then return { 60, 255, 120, 200 }, 50 end
     return nil, 0
 end
 
