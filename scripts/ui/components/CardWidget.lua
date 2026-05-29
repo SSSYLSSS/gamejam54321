@@ -62,15 +62,15 @@ end
 ---@return table|nil glowColor {r, g, b, a}
 local function getGlowColor(card)
     if not card then return nil end
-    if Card.IsJoker(card) then return { 180, 60, 220, 120 } end   -- 紫色
-    if card.rank == 1 then return { 255, 200, 50, 100 } end       -- 金色 (A)
-    if card.rank == 7 then return { 50, 220, 100, 100 } end       -- 绿色
-    if card.rank == 8 then return { 100, 180, 255, 80 } end       -- 蓝色
-    if card.rank == 9 then return { 255, 150, 50, 80 } end        -- 橙色
-    if card.rank == 10 then return { 255, 220, 80, 80 } end       -- 亮黄
-    if card.rank == 11 then return { 120, 80, 255, 110 } end      -- 蓝紫 (J)
-    if card.rank == 12 then return { 255, 80, 150, 100 } end      -- 粉红 (Q)
-    if card.rank == 13 then return { 255, 50, 50, 100 } end       -- 红色 (K)
+    if Card.IsJoker(card) then return { 200, 80, 255, 220 } end   -- 紫色
+    if card.rank == 1 then return { 255, 210, 60, 200 } end       -- 金色 (A)
+    if card.rank == 7 then return { 60, 255, 120, 200 } end       -- 绿色
+    if card.rank == 8 then return { 100, 200, 255, 180 } end      -- 蓝色
+    if card.rank == 9 then return { 255, 170, 60, 180 } end       -- 橙色
+    if card.rank == 10 then return { 255, 230, 80, 180 } end      -- 亮黄
+    if card.rank == 11 then return { 140, 90, 255, 220 } end      -- 蓝紫 (J)
+    if card.rank == 12 then return { 255, 100, 170, 200 } end     -- 粉红 (Q)
+    if card.rank == 13 then return { 255, 60, 60, 200 } end       -- 红色 (K)
     return nil
 end
 
@@ -96,9 +96,9 @@ function CardWidget.Create(card, opts)
     local rankFontSize = isAI and 28 or 54
     local suitFontSize = isAI and 44 or 84
 
-    -- 卡牌光晕
+    -- 卡牌光晕 (加大范围使其更醒目)
     local glowColor = getGlowColor(card)
-    local shadowBlur = glowColor and (isAI and 12 or 20) or 0
+    local shadowBlur = glowColor and (isAI and 24 or 40) or 0
 
     local cardContent
     if not card then
