@@ -9,6 +9,10 @@ local Constant = require("core.Constant")
 
 local CardWidget = {}
 
+-- 呼吸动画: 存储所有带光晕的卡牌引用
+local glowCards = {}
+local breathTime = 0
+
 -- 卡牌尺寸 (3倍大)
 local CARD_WIDTH = 216
 local CARD_HEIGHT = 300
@@ -189,6 +193,15 @@ function CardWidget.Create(card, opts)
         end)
     end
 
+    -- 注册到呼吸动画列表
+    if glowColor then
+        table.insert(glowCards, {
+            panel = cardPanel,
+            baseBlur = shadowBlur,
+            color = glowColor,
+        })
+    end
+
     -- 有卡牌数据且不是AI的牌时，包裹 Tooltip 显示效果提示
     local effectText = card and getCardEffectText(card) or nil
     if effectText and not isAI then
@@ -202,6 +215,37 @@ function CardWidget.Create(card, opts)
     end
 
     return cardPanel
+end
+
+--- 每帧更新呼吸动画 (由 main.lua HandleUpdate 调用)
+---@param dt number deltaTime
+function CardWidget.UpdateBreathing(dt)
+    breathTime = breathTime + dt
+    -- sin 呼吸: 周期约2秒
+    local pulse = math.sin(breathTime * 3.0) -- 3.0 rad/s ≈ 2.1秒周期
+    local factor = 0.6 + 0.4 * (0.5 + pulse * 0.5) -- 范围 0.6~1.0
+
+    for i = #glowCards, 1, -1 do
+        local item = glowCards[i]
+        local panel = item.panel
+        -- 检查面板是否还有效(未被移除)
+        if panel and panel.SetStyle then
+            local newBlur = math.floor(item.baseBlur * factor)
+            local c = item.color
+            local newAlpha = math.floor(c[4] * factor)
+            panel:SetStyle({
+                shadowBlur = newBlur,
+                shadowColor = { c[1], c[2], c[3], newAlpha },
+            })
+        else
+            table.remove(glowCards, i)
+        end
+    end
+end
+
+--- 清空呼吸动画列表 (在 Refresh/场景切换时调用)
+function CardWidget.ClearBreathingList()
+    glowCards = {}
 end
 
 return CardWidget

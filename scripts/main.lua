@@ -12,6 +12,7 @@ local SettingsScene = require("ui.scenes.SettingsScene")
 local GameScene = require("ui.scenes.GameScene")
 local VFXManager = require("vfx.VFXManager")
 local VFXConfig = require("vfx.VFXConfig")
+local CardWidget = require("ui.components.CardWidget")
 
 -- ============================================================================
 -- 全局状态
@@ -165,6 +166,7 @@ end
 function HandleUpdate(eventType, eventData)
     local dt = eventData["TimeStep"]:GetFloat()
     VFXManager.Update(dt)
+    CardWidget.UpdateBreathing(dt)
 end
 
 ---@param eventType string

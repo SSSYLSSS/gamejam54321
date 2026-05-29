@@ -67,6 +67,7 @@ end
 --- 刷新整个游戏界面
 function GameScene.Refresh()
     if not uiRoot then return end
+    CardWidget.ClearBreathingList()
     GameScene._RefreshScore()
     GameScene._RefreshPhaseLabel()
     GameScene._RefreshPlayerHand()
@@ -189,7 +190,7 @@ function GameScene._CreateAIArea()
             UI.Panel {
                 id = "aiHandPanel",
                 flexDirection = "row",
-                gap = 6,
+                gap = 12,
                 flexWrap = "wrap",
                 justifyContent = "center",
                 children = {},
@@ -245,7 +246,7 @@ function GameScene._CreatePlayerArea()
             UI.Panel {
                 id = "playerHandPanel",
                 flexDirection = "row",
-                gap = 6,
+                gap = 12,
                 flexWrap = "wrap",
                 justifyContent = "center",
                 children = {},
