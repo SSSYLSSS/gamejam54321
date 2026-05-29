@@ -502,12 +502,6 @@ function GameScene._ToggleCard(index)
            phase == Constant.PHASE.DRAW_FOUR or
            phase == Constant.PHASE.DRAW_THREE then
             maxSelect = GameController.GetMaxDiscard()
-            -- 7不可选
-            local hand = GameController.GetPlayerHand()
-            if hand[index] and hand[index].rank == 7 then
-                GameScene.SetInfo("7 无法被弃置!")
-                return
-            end
         elseif phase == Constant.PHASE.POST_DISCARD then
             maxSelect = 2
         elseif phase == Constant.PHASE.POST_KEEP then

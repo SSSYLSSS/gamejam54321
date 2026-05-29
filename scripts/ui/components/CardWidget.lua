@@ -57,6 +57,23 @@ local function getCardEffectText(card)
     return nil
 end
 
+--- 获取卡牌光晕颜色 (用于 shadowColor)
+---@param card table|nil
+---@return table|nil glowColor {r, g, b, a}
+local function getGlowColor(card)
+    if not card then return nil end
+    if Card.IsJoker(card) then return { 180, 60, 220, 120 } end   -- 紫色
+    if card.rank == 1 then return { 255, 200, 50, 100 } end       -- 金色 (A)
+    if card.rank == 7 then return { 50, 220, 100, 100 } end       -- 绿色
+    if card.rank == 8 then return { 100, 180, 255, 80 } end       -- 蓝色
+    if card.rank == 9 then return { 255, 150, 50, 80 } end        -- 橙色
+    if card.rank == 10 then return { 255, 220, 80, 80 } end       -- 亮黄
+    if card.rank == 11 then return { 120, 80, 255, 110 } end      -- 蓝紫 (J)
+    if card.rank == 12 then return { 255, 80, 150, 100 } end      -- 粉红 (Q)
+    if card.rank == 13 then return { 255, 50, 50, 100 } end       -- 红色 (K)
+    return nil
+end
+
 --- 创建一个卡牌 UI 组件
 ---@param card table|nil 卡牌数据(nil 表示牌背)
 ---@param opts table 选项 {selected, selectable, onClick, isAI}
@@ -78,6 +95,10 @@ function CardWidget.Create(card, opts)
 
     local rankFontSize = isAI and 28 or 54
     local suitFontSize = isAI and 44 or 84
+
+    -- 卡牌光晕
+    local glowColor = getGlowColor(card)
+    local shadowBlur = glowColor and (isAI and 12 or 20) or 0
 
     local cardContent
     if not card then
@@ -149,6 +170,11 @@ function CardWidget.Create(card, opts)
         pointerEvents = (selectable or (card ~= nil)) and "auto" or "none",
         transition = "scale 0.15s easeOut",
         transformOrigin = "center",
+        -- 卡牌光晕 (彩色阴影)
+        shadowX = 0,
+        shadowY = 0,
+        shadowBlur = shadowBlur,
+        shadowColor = glowColor or { 0, 0, 0, 0 },
         children = cardContent,
         onClick = (selectable and opts.onClick) and opts.onClick or nil,
     }
