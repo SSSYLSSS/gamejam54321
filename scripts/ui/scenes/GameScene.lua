@@ -17,6 +17,9 @@ local selectedCards = {}     -- 选中的牌索引集合
 local uiRoot = nil           -- 当前 UI 根节点
 local viewingPile = nil      -- 正在查看的牌堆
 
+-- 结算翻牌动画状态
+local settlementAnim = nil   -- nil=无动画, table=动画进行中
+
 -- 回调(由 UIManager 设置)
 local sceneCallbacks = {}
 
@@ -109,6 +112,19 @@ end
 --- 重置选牌状态
 function GameScene.ClearSelection()
     selectedCards = {}
+end
+
+--- 每帧更新 (驱动结算翻牌动画)
+---@param dt number
+function GameScene.Update(dt)
+    if not settlementAnim then return end
+    local anim = settlementAnim
+    anim.timer = anim.timer + dt
+    if anim.timer >= anim.interval and anim.revealedCount < #anim.aiHand then
+        anim.timer = 0
+        anim.revealedCount = anim.revealedCount + 1
+        GameScene._UpdateSettlementOverlay()
+    end
 end
 
 --- 处理 ESC 键
@@ -680,11 +696,15 @@ function GameScene._OnAction()
             GameScene.SetInfo(err or "操作失败")
             return
         end
-        -- 弃牌粒子效果
+        -- 弃牌飞行动画: 从手牌区飞向右侧弃牌堆
         if #indices > 0 then
             local sw = graphics:GetWidth() / graphics:GetDPR()
             local sh = graphics:GetHeight() / graphics:GetDPR()
-            VFXManager.EmitDiscardParticles(sw * 0.5, sh * 0.7)
+            local startX = sw * 0.5
+            local startY = sh * 0.75
+            local endX = sw - 45   -- 右侧弃牌堆大致位置
+            local endY = sh * 0.7  -- 玩家弃牌堆位置(下方)
+            VFXManager.EmitFlyingCards(startX, startY, endX, endY, #indices)
         end
         selectedCards = {}
 
@@ -731,6 +751,12 @@ function GameScene._OnAction()
         if #indices > 2 then
             GameScene.SetInfo("最多弃置2张!")
             return
+        end
+        -- 弃牌飞行动画
+        if #indices > 0 then
+            local sw = graphics:GetWidth() / graphics:GetDPR()
+            local sh = graphics:GetHeight() / graphics:GetDPR()
+            VFXManager.EmitFlyingCards(sw * 0.5, sh * 0.75, sw - 45, sh * 0.7, #indices)
         end
         GameController.PlayerPostDiscard(indices)
         selectedCards = {}
@@ -850,28 +876,234 @@ end
 
 function GameScene._ShowSettlementResult(result)
     if not result then return end
-    local text = ""
+
+    -- 三7特殊规则: 直接显示结果(无需逐张翻牌)
     if result.sevenRuleTriggered then
-        text = "三7特殊规则触发! "
+        local sw = graphics:GetWidth() / graphics:GetDPR()
+        local sh = graphics:GetHeight() / graphics:GetDPR()
+        local cx, cy = sw * 0.5, sh * 0.5
+        local text = "三7特殊规则触发! "
+        if result.winner == "player" then
+            text = text .. "你赢了!"
+            VFXManager.EmitWinParticles(cx, cy)
+        elseif result.winner == "ai" then
+            text = text .. "AI赢了!"
+            VFXManager.EmitLoseParticles(cx, cy)
+        else
+            text = text .. "平局!"
+        end
+        GameScene.SetInfo(text)
+        return
     end
 
-    -- 获取屏幕中心用于粒子效果
-    local sw = graphics:GetWidth() / graphics:GetDPR()
-    local sh = graphics:GetHeight() / graphics:GetDPR()
-    local cx, cy = sw * 0.5, sh * 0.5
+    -- 启动逐张翻牌动画
+    local aiHand = GameController.GetAIHand()
+    local playerHand = GameController.GetPlayerHand()
+    settlementAnim = {
+        result = result,
+        aiHand = aiHand,
+        playerHand = playerHand,
+        revealedCount = 0,
+        timer = 0,
+        interval = 0.7,  -- 每0.7秒翻一张
+        finished = false,
+    }
+    -- 创建结算弹窗
+    GameScene._CreateSettlementOverlay()
+end
 
-    if result.winner == "player" then
-        text = text .. string.format("你赢了! (%d点 vs %d点)", result.playerPoints, result.aiPoints)
-        -- 胜利烟花
-        VFXManager.EmitWinParticles(cx, cy)
-    elseif result.winner == "ai" then
-        text = text .. string.format("AI赢了! (%d点 vs %d点)", result.playerPoints, result.aiPoints)
-        -- 失败粒子
-        VFXManager.EmitLoseParticles(cx, cy)
+--- 创建结算翻牌弹窗
+function GameScene._CreateSettlementOverlay()
+    if not uiRoot then return end
+    local anim = settlementAnim
+    if not anim then return end
+
+    local overlay = UI.Panel {
+        id = "settlementOverlay",
+        width = "100%",
+        height = "100%",
+        position = "absolute",
+        backgroundColor = { 0, 0, 0, 200 },
+        justifyContent = "center",
+        alignItems = "center",
+        children = {
+            UI.Panel {
+                id = "settlementContent",
+                width = "90%",
+                maxHeight = "80%",
+                backgroundColor = Colors.menuCard,
+                borderRadius = 12,
+                borderWidth = 1,
+                borderColor = Colors.gold,
+                padding = 20,
+                gap = 14,
+                alignItems = "center",
+                children = GameScene._BuildSettlementContent(),
+            }
+        }
+    }
+    uiRoot:AddChild(overlay)
+end
+
+--- 更新结算弹窗内容(每翻一张牌时重建)
+function GameScene._UpdateSettlementOverlay()
+    local overlay = uiRoot:FindById("settlementOverlay")
+    if overlay then overlay:Remove() end
+    GameScene._CreateSettlementOverlay()
+
+    -- 全部翻完后触发结算效果
+    local anim = settlementAnim
+    if anim and anim.revealedCount >= #anim.aiHand then
+        local sw = graphics:GetWidth() / graphics:GetDPR()
+        local sh = graphics:GetHeight() / graphics:GetDPR()
+        local cx, cy = sw * 0.5, sh * 0.5
+        if anim.result.winner == "player" then
+            VFXManager.EmitWinParticles(cx, cy)
+        elseif anim.result.winner == "ai" then
+            VFXManager.EmitLoseParticles(cx, cy)
+        end
+    end
+end
+
+--- 构建结算弹窗的内容children
+---@return table[]
+function GameScene._BuildSettlementContent()
+    local anim = settlementAnim
+    if not anim then return {} end
+
+    local revealed = anim.revealedCount
+    local allRevealed = revealed >= #anim.aiHand
+
+    -- 计算当前已翻开牌的累计点数(简化: 用基础点数展示渐进效果)
+    local playerPts = anim.result.playerPoints  -- 玩家点数固定(全部可见)
+    local aiPtsShown = 0
+    if allRevealed then
+        aiPtsShown = anim.result.aiPoints
     else
-        text = text .. string.format("平局! (%d点 vs %d点)", result.playerPoints, result.aiPoints)
+        -- 逐步累加已翻开牌的基础点数
+        for i = 1, revealed do
+            local card = anim.aiHand[i]
+            if card then
+                local basePts = Card.GetBasePoints(card)
+                -- 普通牌(2-6)直接加，特殊牌按效果类型标注
+                if card.rank >= 2 and card.rank <= 6 then
+                    aiPtsShown = aiPtsShown + basePts
+                elseif card.rank >= 7 and card.rank <= 10 then
+                    aiPtsShown = aiPtsShown + basePts
+                end
+                -- J/Q/K/A/Joker 基础点数为0或特殊
+            end
+        end
     end
-    GameScene.SetInfo(text)
+
+    -- AI 手牌显示行 (翻开的显示正面,未翻的显示背面)
+    local aiCardWidgets = {}
+    for i, card in ipairs(anim.aiHand) do
+        if i <= revealed then
+            table.insert(aiCardWidgets, CardWidget.Create(card, { small = true }))
+        else
+            table.insert(aiCardWidgets, CardWidget.Create(nil, { small = true }))
+        end
+    end
+
+    -- 玩家手牌显示行
+    local playerCardWidgets = {}
+    for _, card in ipairs(anim.playerHand) do
+        table.insert(playerCardWidgets, CardWidget.Create(card, { small = true }))
+    end
+
+    -- 点数显示
+    local aiPtsText = allRevealed and string.format("%d 点", aiPtsShown) or string.format("%d 点...", aiPtsShown)
+    local playerPtsText = string.format("%d 点", playerPts)
+
+    -- 结果文字(全部翻开后显示)
+    local resultChildren = {}
+    if allRevealed then
+        local resultText = ""
+        local resultColor = Colors.textDim
+        if anim.result.winner == "player" then
+            resultText = "你赢了!"
+            resultColor = Colors.success
+        elseif anim.result.winner == "ai" then
+            resultText = "AI赢了!"
+            resultColor = { 255, 100, 100, 255 }
+        else
+            resultText = "平局!"
+            resultColor = Colors.gold
+        end
+        table.insert(resultChildren, UI.Label {
+            text = resultText,
+            fontSize = 20,
+            fontColor = resultColor,
+        })
+        table.insert(resultChildren, UI.Button {
+            text = "继续",
+            variant = "primary",
+            onClick = function()
+                GameScene._CloseSettlementOverlay()
+            end,
+        })
+    else
+        table.insert(resultChildren, UI.Label {
+            text = string.format("翻牌中... (%d/%d)", revealed, #anim.aiHand),
+            fontSize = 12,
+            fontColor = Colors.textDim,
+        })
+    end
+
+    return {
+        UI.Label { text = "结算", fontSize = 18, fontColor = Colors.gold },
+        -- AI 区域
+        UI.Panel {
+            width = "100%", gap = 6, alignItems = "center",
+            children = {
+                UI.Panel {
+                    flexDirection = "row", gap = 4, alignItems = "center",
+                    children = {
+                        UI.Label { text = "AI:", fontSize = 13, fontColor = Colors.textDim },
+                        UI.Label { text = aiPtsText, fontSize = 15, fontColor = { 255, 180, 80, 255 } },
+                    }
+                },
+                UI.Panel {
+                    flexDirection = "row", gap = 6, flexWrap = "wrap", justifyContent = "center",
+                    children = aiCardWidgets,
+                },
+            }
+        },
+        -- 分隔
+        UI.Panel { width = "80%", height = 1, backgroundColor = Colors.menuBorder },
+        -- 玩家区域
+        UI.Panel {
+            width = "100%", gap = 6, alignItems = "center",
+            children = {
+                UI.Panel {
+                    flexDirection = "row", gap = 4, alignItems = "center",
+                    children = {
+                        UI.Label { text = "你:", fontSize = 13, fontColor = Colors.textDim },
+                        UI.Label { text = playerPtsText, fontSize = 15, fontColor = Colors.success },
+                    }
+                },
+                UI.Panel {
+                    flexDirection = "row", gap = 6, flexWrap = "wrap", justifyContent = "center",
+                    children = playerCardWidgets,
+                },
+            }
+        },
+        -- 分隔
+        UI.Panel { width = "80%", height = 1, backgroundColor = Colors.menuBorder },
+        -- 结果
+        UI.Panel {
+            width = "100%", alignItems = "center", gap = 8,
+            children = resultChildren,
+        },
+    }
+end
+
+--- 关闭结算弹窗
+function GameScene._CloseSettlementOverlay()
+    settlementAnim = nil
+    local overlay = uiRoot:FindById("settlementOverlay")
+    if overlay then overlay:Remove() end
 end
 
 -- ============================================================================
@@ -899,6 +1131,26 @@ local function sortPile(pile)
     return sorted
 end
 
+--- 按rank分组: 返回 { {rankKey, cards}, ... } 排好序
+---@param pile table[]
+---@return table[]
+local function groupByRank(pile)
+    local sorted = sortPile(pile)
+    local groups = {}
+    local currentRank = nil
+    local currentGroup = nil
+    for _, card in ipairs(sorted) do
+        local rk = Card.IsJoker(card) and 99 or card.rank
+        if rk ~= currentRank then
+            currentRank = rk
+            currentGroup = { rank = rk, cards = {} }
+            table.insert(groups, currentGroup)
+        end
+        table.insert(currentGroup.cards, card)
+    end
+    return groups
+end
+
 function GameScene._ShowPileView(pileType)
     viewingPile = pileType
 
@@ -913,19 +1165,31 @@ function GameScene._ShowPileView(pileType)
         return
     end
 
-    -- 排序
-    local sortedPile = sortPile(pile)
+    -- 按rank分组
+    local groups = groupByRank(pile)
 
-    local cardWidgets = {}
-    if #sortedPile == 0 then
-        table.insert(cardWidgets, UI.Label {
+    local rowWidgets = {}
+    if #pile == 0 then
+        table.insert(rowWidgets, UI.Label {
             text = "（空）",
             fontSize = 14,
             fontColor = Colors.textDim,
         })
     else
-        for _, card in ipairs(sortedPile) do
-            table.insert(cardWidgets, CardWidget.Create(card, { small = true }))
+        for _, group in ipairs(groups) do
+            local cardRow = {}
+            for _, card in ipairs(group.cards) do
+                table.insert(cardRow, CardWidget.Create(card, { small = true }))
+            end
+            table.insert(rowWidgets, UI.Panel {
+                width = "100%",
+                flexDirection = "row",
+                gap = 6,
+                paddingHorizontal = 8,
+                paddingVertical = 4,
+                alignItems = "center",
+                children = cardRow,
+            })
         end
     end
 
@@ -956,7 +1220,7 @@ function GameScene._ShowPileView(pileType)
                         alignItems = "center",
                         children = {
                             UI.Label {
-                                text = title .. string.format(" (%d张)", #sortedPile),
+                                text = title .. string.format(" (%d张)", #pile),
                                 fontSize = 16,
                                 fontColor = Colors.gold,
                             },
@@ -980,12 +1244,9 @@ function GameScene._ShowPileView(pileType)
                         children = {
                             UI.Panel {
                                 width = "100%",
-                                flexDirection = "row",
-                                flexWrap = "wrap",
-                                gap = 6,
-                                justifyContent = "center",
-                                padding = 8,
-                                children = cardWidgets,
+                                gap = 2,
+                                padding = 4,
+                                children = rowWidgets,
                             }
                         }
                     },

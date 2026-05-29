@@ -167,6 +167,9 @@ function HandleUpdate(eventType, eventData)
     local dt = eventData["TimeStep"]:GetFloat()
     VFXManager.Update(dt)
     CardWidget.UpdateBreathing(dt)
+    if currentScene == "game" then
+        GameScene.Update(dt)
+    end
 end
 
 ---@param eventType string
