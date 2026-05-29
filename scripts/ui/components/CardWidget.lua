@@ -183,16 +183,6 @@ function CardWidget.Create(card, opts)
         onClick = (selectable and opts.onClick) and opts.onClick or nil,
     }
 
-    -- 悬停放大效果 (仅玩家手牌) + zIndex 提升避免被右侧牌遮挡
-    if not isAI then
-        cardPanel:OnEvent("pointerenter", function()
-            cardPanel:SetStyle({ scale = 1.2, zIndex = 100 })
-        end)
-        cardPanel:OnEvent("pointerleave", function()
-            cardPanel:SetStyle({ scale = 1.0, zIndex = 0 })
-        end)
-    end
-
     -- 注册到呼吸动画列表
     if glowColor then
         table.insert(glowCards, {
@@ -205,14 +195,34 @@ function CardWidget.Create(card, opts)
     -- 有卡牌数据且不是AI的牌时，包裹 Tooltip 显示效果提示
     local effectText = card and getCardEffectText(card) or nil
     if effectText and not isAI then
-        return UI.Tooltip {
+        local tooltipWrapper = UI.Tooltip {
             content = effectText,
             position = "top",
             delay = 0,
             fontSize = 28,
             maxWidth = 500,
+            transition = "scale 0.15s easeOut",
+            transformOrigin = "center",
             children = { cardPanel },
         }
+        -- 悬停放大 + zIndex 提升设在 Tooltip 外层容器上
+        tooltipWrapper:OnEvent("pointerenter", function()
+            tooltipWrapper:SetStyle({ scale = 1.2, zIndex = 100 })
+        end)
+        tooltipWrapper:OnEvent("pointerleave", function()
+            tooltipWrapper:SetStyle({ scale = 1.0, zIndex = 0 })
+        end)
+        return tooltipWrapper
+    end
+
+    -- 无 Tooltip 的卡牌 (普通牌2~6无特效文字，或AI牌)
+    if not isAI then
+        cardPanel:OnEvent("pointerenter", function()
+            cardPanel:SetStyle({ scale = 1.2, zIndex = 100 })
+        end)
+        cardPanel:OnEvent("pointerleave", function()
+            cardPanel:SetStyle({ scale = 1.0, zIndex = 0 })
+        end)
     end
 
     return cardPanel
