@@ -118,16 +118,28 @@ function GameScene.ClearSelection()
     selectedCards = {}
 end
 
---- 每帧更新 (驱动结算翻牌动画)
+--- 每帧更新 (驱动结算翻牌动画 + 自动推进)
 ---@param dt number
 function GameScene.Update(dt)
     if not settlementAnim then return end
     local anim = settlementAnim
     anim.timer = anim.timer + dt
-    if anim.timer >= anim.interval and anim.revealedCount < #anim.aiHand then
-        anim.timer = 0
-        anim.revealedCount = anim.revealedCount + 1
-        GameScene._UpdateSettlementOverlay()
+    if anim.revealedCount < #anim.aiHand then
+        -- 逐张翻牌阶段
+        if anim.timer >= anim.interval then
+            anim.timer = 0
+            anim.revealedCount = anim.revealedCount + 1
+            GameScene._UpdateSettlementOverlay()
+        end
+    else
+        -- 全部翻完后等待1.5秒自动进入下一阶段
+        if not anim.autoAdvanceTimer then
+            anim.autoAdvanceTimer = 0
+        end
+        anim.autoAdvanceTimer = anim.autoAdvanceTimer + dt
+        if anim.autoAdvanceTimer >= 1.5 then
+            GameScene._CloseSettlementAndAdvance()
+        end
     end
 end
 
@@ -631,9 +643,8 @@ function GameScene._RefreshButtons()
         actionBtn:SetDisabled(false)
         if skipBtn then skipBtn:SetVisible(false) end
     elseif phase == Constant.PHASE.SETTLEMENT then
-        actionBtn:SetText("继续")
-        actionBtn:SetVisible(true)
-        actionBtn:SetDisabled(false)
+        -- 结算阶段通过弹窗自动推进，隐藏底部按钮
+        actionBtn:SetVisible(false)
         if skipBtn then skipBtn:SetVisible(false) end
     else
         actionBtn:SetVisible(false)
@@ -780,10 +791,7 @@ function GameScene._OnAction()
     end
 
     if phase == Constant.PHASE.SETTLEMENT then
-        GameController.EnterPostGame()
-        selectedCards = {}
-        GameScene.SetInfo("选择至多2张牌放回你的抽牌堆")
-        GameScene.Refresh()
+        -- 结算阶段通过弹窗自动推进，不再需要底部按钮
         return
     end
 
@@ -793,11 +801,11 @@ function GameScene._OnAction()
             GameScene.SetInfo("最多弃置2张!")
             return
         end
-        -- 弃牌飞行动画
+        -- 放回抽牌堆飞行动画: 从手牌区飞向左侧抽牌堆
         if #indices > 0 then
             local sw = graphics:GetWidth() / graphics:GetDPR()
             local sh = graphics:GetHeight() / graphics:GetDPR()
-            VFXManager.EmitFlyingCards(sw * 0.5, sh * 0.75, sw - 45, sh * 0.7, #indices)
+            VFXManager.EmitFlyingCards(sw * 0.5, sh * 0.75, 45, sh * 0.7, #indices)
         end
         GameController.PlayerPostDiscard(indices)
         selectedCards = {}
@@ -946,7 +954,7 @@ function GameScene._ShowSettlementResult(result)
         playerHand = playerHand,
         revealedCount = 0,
         timer = 0,
-        interval = 0.7,  -- 每0.7秒翻一张
+        interval = 1.0,  -- 每1.0秒翻一张
         finished = false,
     }
     -- 创建结算弹窗
@@ -1081,7 +1089,7 @@ function GameScene._BuildSettlementContent()
             text = "继续",
             variant = "primary",
             onClick = function()
-                GameScene._CloseSettlementOverlay()
+                GameScene._CloseSettlementAndAdvance()
             end,
         })
     else
@@ -1145,6 +1153,15 @@ function GameScene._CloseSettlementOverlay()
     settlementAnim = nil
     local overlay = uiRoot:FindById("settlementOverlay")
     if overlay then overlay:Remove() end
+end
+
+--- 关闭结算弹窗并自动推进到POST_DISCARD阶段
+function GameScene._CloseSettlementAndAdvance()
+    GameScene._CloseSettlementOverlay()
+    GameController.EnterPostGame()
+    selectedCards = {}
+    GameScene.SetInfo("选择至多2张牌放回你的抽牌堆")
+    GameScene.Refresh()
 end
 
 -- ============================================================================
