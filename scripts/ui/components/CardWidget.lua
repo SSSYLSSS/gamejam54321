@@ -61,21 +61,27 @@ local function getCardEffectText(card)
     return nil
 end
 
---- 获取卡牌光晕颜色 (用于 shadowColor)
+--- 获取卡牌光晕颜色和大小 (用于 shadowColor / shadowBlur)
 ---@param card table|nil
 ---@return table|nil glowColor {r, g, b, a}
+---@return number baseBlur 光晕模糊半径
 local function getGlowColor(card)
-    if not card then return nil end
-    if Card.IsJoker(card) then return { 200, 80, 255, 220 } end   -- 紫色
-    if card.rank == 1 then return { 255, 210, 60, 200 } end       -- 金色 (A)
-    if card.rank == 7 then return { 60, 255, 120, 200 } end       -- 绿色
-    if card.rank == 8 then return { 100, 200, 255, 180 } end      -- 蓝色
-    if card.rank == 9 then return { 255, 170, 60, 180 } end       -- 橙色
-    if card.rank == 10 then return { 255, 230, 80, 180 } end      -- 亮黄
-    if card.rank == 11 then return { 140, 90, 255, 220 } end      -- 蓝紫 (J)
-    if card.rank == 12 then return { 255, 100, 170, 200 } end     -- 粉红 (Q)
-    if card.rank == 13 then return { 255, 60, 60, 200 } end       -- 红色 (K)
-    return nil
+    if not card then return nil, 0 end
+    -- 鬼牌: 暗金色, 最大光晕
+    if Card.IsJoker(card) then return { 180, 150, 50, 220 }, 60 end
+    -- A: 金色, 第二大光晕
+    if card.rank == 1 then return { 255, 210, 60, 200 }, 50 end
+    -- J~K: 紫色, 第三大光晕
+    if card.rank == 11 then return { 160, 80, 255, 220 }, 44 end
+    if card.rank == 12 then return { 160, 80, 255, 220 }, 44 end
+    if card.rank == 13 then return { 160, 80, 255, 220 }, 44 end
+    -- 8~10: 蓝色, 基础光晕
+    if card.rank == 8 then return { 100, 180, 255, 180 }, 40 end
+    if card.rank == 9 then return { 100, 180, 255, 180 }, 40 end
+    if card.rank == 10 then return { 100, 180, 255, 180 }, 40 end
+    -- 7: 绿色（保留）
+    if card.rank == 7 then return { 60, 255, 120, 200 }, 40 end
+    return nil, 0
 end
 
 --- 创建一个卡牌 UI 组件
@@ -101,8 +107,8 @@ function CardWidget.Create(card, opts)
     local suitFontSize = isAI and 44 or 84
 
     -- 卡牌光晕 (加大范围使其更醒目)
-    local glowColor = getGlowColor(card)
-    local shadowBlur = glowColor and (isAI and 24 or 40) or 0
+    local glowColor, glowBaseBlur = getGlowColor(card)
+    local shadowBlur = glowColor and (isAI and math.floor(glowBaseBlur * 0.6) or glowBaseBlur) or 0
 
     local cardContent
     if not card then
