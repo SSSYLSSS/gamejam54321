@@ -183,13 +183,13 @@ function CardWidget.Create(card, opts)
         onClick = (selectable and opts.onClick) and opts.onClick or nil,
     }
 
-    -- 悬停放大效果 (仅玩家手牌)
+    -- 悬停放大效果 (仅玩家手牌) + zIndex 提升避免被右侧牌遮挡
     if not isAI then
         cardPanel:OnEvent("pointerenter", function()
-            cardPanel:SetStyle({ scale = 1.2 })
+            cardPanel:SetStyle({ scale = 1.2, zIndex = 100 })
         end)
         cardPanel:OnEvent("pointerleave", function()
-            cardPanel:SetStyle({ scale = 1.0 })
+            cardPanel:SetStyle({ scale = 1.0, zIndex = 0 })
         end)
     end
 
@@ -208,8 +208,9 @@ function CardWidget.Create(card, opts)
         return UI.Tooltip {
             content = effectText,
             position = "top",
-            delay = 0.3,
-            maxWidth = 260,
+            delay = 0,
+            fontSize = 28,
+            maxWidth = 500,
             children = { cardPanel },
         }
     end
