@@ -8,6 +8,7 @@ local Card = require("core.Card")
 local Constant = require("core.Constant")
 local CardWidget = require("ui.components.CardWidget")
 local GameController = require("service.GameController")
+local VFXManager = require("vfx.VFXManager")
 
 local GameScene = {}
 
@@ -561,6 +562,12 @@ function GameScene._OnAction()
             GameScene.SetInfo(err or "操作失败")
             return
         end
+        -- 弃牌粒子效果
+        if #indices > 0 then
+            local sw = graphics:GetWidth() / graphics:GetDPR()
+            local sh = graphics:GetHeight() / graphics:GetDPR()
+            VFXManager.EmitDiscardParticles(sw * 0.5, sh * 0.7)
+        end
         selectedCards = {}
 
         -- 检查J效果
@@ -729,10 +736,20 @@ function GameScene._ShowSettlementResult(result)
     if result.sevenRuleTriggered then
         text = "三7特殊规则触发! "
     end
+
+    -- 获取屏幕中心用于粒子效果
+    local sw = graphics:GetWidth() / graphics:GetDPR()
+    local sh = graphics:GetHeight() / graphics:GetDPR()
+    local cx, cy = sw * 0.5, sh * 0.5
+
     if result.winner == "player" then
         text = text .. string.format("你赢了! (%d点 vs %d点)", result.playerPoints, result.aiPoints)
+        -- 胜利烟花
+        VFXManager.EmitWinParticles(cx, cy)
     elseif result.winner == "ai" then
         text = text .. string.format("AI赢了! (%d点 vs %d点)", result.playerPoints, result.aiPoints)
+        -- 失败粒子
+        VFXManager.EmitLoseParticles(cx, cy)
     else
         text = text .. string.format("平局! (%d点 vs %d点)", result.playerPoints, result.aiPoints)
     end
@@ -916,6 +933,11 @@ function GameScene._OnJackPick(source)
         GameScene.SetInfo(err or "抽取失败")
         return
     end
+
+    -- J效果紫色闪光
+    local sw = graphics:GetWidth() / graphics:GetDPR()
+    local sh = graphics:GetHeight() / graphics:GetDPR()
+    VFXManager.EmitJackEffect(sw * 0.5, sh * 0.5)
 
     -- 关闭弹窗
     local overlay = uiRoot:FindById("jackPickOverlay")

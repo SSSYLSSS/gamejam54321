@@ -1,0 +1,166 @@
+-- ============================================================================
+-- vfx/ParticleSystem.lua - NanoVG 粒子系统
+-- 支持: 胜利烟花、弃牌飞散、金色碎片
+-- ============================================================================
+
+local VFXConfig = require("vfx.VFXConfig")
+
+local ParticleSystem = {}
+ParticleSystem.__index = ParticleSystem
+
+---@class Particle
+---@field x number
+---@field y number
+---@field vx number
+---@field vy number
+---@field life number
+---@field maxLife number
+---@field radius number
+---@field r number
+---@field g number
+---@field b number
+---@field brightness number
+
+--- 创建粒子系统实例
+---@return table
+function ParticleSystem.New()
+    local self = setmetatable({}, ParticleSystem)
+    self.particles = {}
+    return self
+end
+
+--- 发射一组粒子 (胜利烟花效果)
+---@param x number 发射中心X
+---@param y number 发射中心Y
+---@param count number 粒子数量
+---@param opts table|nil 可选参数 {color, speed, life, radius}
+function ParticleSystem:Emit(x, y, count, opts)
+    opts = opts or {}
+    local baseR = opts.r or 1.0
+    local baseG = opts.g or 0.85
+    local baseB = opts.b or 0.2
+    local speed = opts.speed or 200
+    local life = opts.life or 1.5
+    local radius = opts.radius or 4
+
+    for _ = 1, count do
+        if #self.particles >= VFXConfig.MAX_PARTICLES then break end
+
+        local angle = math.random() * math.pi * 2
+        local spd = speed * (0.3 + math.random() * 0.7)
+
+        local p = {
+            x = x,
+            y = y,
+            vx = math.cos(angle) * spd,
+            vy = math.sin(angle) * spd,
+            life = life * (0.6 + math.random() * 0.4),
+            maxLife = life,
+            radius = radius * (0.5 + math.random() * 0.5),
+            r = baseR * (0.8 + math.random() * 0.2),
+            g = baseG * (0.8 + math.random() * 0.2),
+            b = baseB * (0.5 + math.random() * 0.5),
+            brightness = 1.4 + math.random() * 0.4,
+        }
+        table.insert(self.particles, p)
+    end
+end
+
+--- 发射向上喷射的粒子 (弃牌效果)
+---@param x number
+---@param y number
+---@param count number
+function ParticleSystem:EmitUpward(x, y, count)
+    for _ = 1, count do
+        if #self.particles >= VFXConfig.MAX_PARTICLES then break end
+
+        local p = {
+            x = x + (math.random() - 0.5) * 40,
+            y = y,
+            vx = (math.random() - 0.5) * 60,
+            vy = -(100 + math.random() * 80),
+            life = 0.8 + math.random() * 0.4,
+            maxLife = 1.0,
+            radius = 2 + math.random() * 2,
+            r = 0.4,
+            g = 0.6,
+            b = 1.0,
+            brightness = 1.3,
+        }
+        table.insert(self.particles, p)
+    end
+end
+
+--- 更新所有粒子
+---@param dt number 时间步
+function ParticleSystem:Update(dt)
+    local gravity = VFXConfig.PARTICLE_GRAVITY
+    local i = 1
+    while i <= #self.particles do
+        local p = self.particles[i]
+        p.life = p.life - dt
+        if p.life <= 0 then
+            table.remove(self.particles, i)
+        else
+            p.x = p.x + p.vx * dt
+            p.y = p.y + p.vy * dt
+            p.vy = p.vy + gravity * dt
+            -- 亮度随生命衰减
+            local lifeRatio = p.life / p.maxLife
+            p.brightness = 1.0 + (p.brightness - 1.0) * lifeRatio
+            i = i + 1
+        end
+    end
+end
+
+--- 渲染所有粒子 (NanoVG)
+---@param ctx any NanoVG context
+function ParticleSystem:Render(ctx)
+    for _, p in ipairs(self.particles) do
+        local lifeRatio = p.life / p.maxLife
+        local alpha = lifeRatio
+        local radius = p.radius * (0.5 + lifeRatio * 0.5)
+
+        local hdrR = p.r * p.brightness
+        local hdrG = p.g * p.brightness
+        local hdrB = p.b * p.brightness
+
+        -- Bloom glow (只在亮度>1时)
+        if p.brightness > 1.0 then
+            local maxR = radius * VFXConfig.BLOOM_SIZE * (1.0 + VFXConfig.BLOOM_OUTER_ALPHA * 3.0)
+            local innerR = radius * VFXConfig.BLOOM_MID_ALPHA * 0.5
+
+            nvgBeginPath(ctx)
+            nvgCircle(ctx, p.x, p.y, maxR)
+            local grad = nvgRadialGradient(ctx, p.x, p.y, innerR, maxR,
+                nvgRGBAf(hdrR, hdrG, hdrB, VFXConfig.BLOOM_INNER_ALPHA * alpha),
+                nvgRGBAf(hdrR, hdrG, hdrB, 0))
+            nvgFillPaint(ctx, grad)
+            nvgFill(ctx)
+        end
+
+        -- 核心圆
+        nvgBeginPath(ctx)
+        nvgCircle(ctx, p.x, p.y, radius)
+        nvgFillColor(ctx, nvgRGBAf(
+            math.min(1, hdrR),
+            math.min(1, hdrG),
+            math.min(1, hdrB),
+            alpha
+        ))
+        nvgFill(ctx)
+    end
+end
+
+--- 是否还有活跃粒子
+---@return boolean
+function ParticleSystem:IsActive()
+    return #self.particles > 0
+end
+
+--- 清除所有粒子
+function ParticleSystem:Clear()
+    self.particles = {}
+end
+
+return ParticleSystem
