@@ -161,7 +161,7 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
     end
 
     -- =======================================================================
-    -- 6. K 效果: 手中每张 K 给最终点数 +1
+    -- 6. K 效果: 在 Settle 中统一处理(对方取整+自己-5取整)
     -- =======================================================================
     local kingCount = 0
     for _, card in ipairs(hand) do
@@ -169,8 +169,7 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
             kingCount = kingCount + 1
         end
     end
-    totalPoints = totalPoints + kingCount
-    details.kingBonus = kingCount
+    details.kingCount = kingCount
 
     -- =======================================================================
     -- 7. 10 效果: 每张弃置过的 10 给最终点数 +1
@@ -259,6 +258,21 @@ function RuleEngine.Settle(playerHand, aiHand, playerState, aiState)
         -- 正常结算: 比较谁更接近21
         local playerPts, playerDetails = RuleEngine.CalculatePoints(playerHand, aiHand, playerState, aiState)
         local aiPts, aiDetails = RuleEngine.CalculatePoints(aiHand, playerHand, aiState, playerState)
+
+        -- K 效果: 持有K时，对方点数向上取整，自己点数-5后向下取整
+        local playerKings = playerDetails.kingCount or 0
+        local aiKings = aiDetails.kingCount or 0
+
+        if playerKings > 0 then
+            aiPts = math.ceil(aiPts)         -- 对方向上取整
+            playerPts = math.floor(playerPts - 5)  -- 自己-5后向下取整
+            playerDetails.kingApplied = true
+        end
+        if aiKings > 0 then
+            playerPts = math.ceil(playerPts)  -- 对方向上取整
+            aiPts = math.floor(aiPts - 5)     -- 自己-5后向下取整
+            aiDetails.kingApplied = true
+        end
 
         result.playerPoints = playerPts
         result.aiPoints = aiPts
