@@ -1,0 +1,5 @@
+*.meta
+.luarc.json
+.tmp/
+dist/
+logs/
