@@ -1155,9 +1155,16 @@ function GameScene._CloseSettlementOverlay()
     if overlay then overlay:Remove() end
 end
 
---- 关闭结算弹窗并自动推进到POST_DISCARD阶段
+--- 关闭结算弹窗并自动推进到POST_DISCARD阶段(或直接结束游戏)
 function GameScene._CloseSettlementAndAdvance()
     GameScene._CloseSettlementOverlay()
+    -- 比分已达胜利条件时跳过二!/一!直接结束
+    if GameController.IsGameOver() then
+        GameController.SkipToGameOver()
+        selectedCards = {}
+        GameScene.Refresh()
+        return
+    end
     GameController.EnterPostGame()
     selectedCards = {}
     GameScene.SetInfo("选择至多2张牌放回你的抽牌堆")

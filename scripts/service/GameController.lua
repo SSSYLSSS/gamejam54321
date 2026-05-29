@@ -240,6 +240,12 @@ function GameController.EnterPostGame()
     state.round.subPhase = Constant.SUB_PHASE.PLAYER_TURN
 end
 
+--- 比分已达胜利条件时直接跳到游戏结束(跳过二!/一!)
+function GameController.SkipToGameOver()
+    if not state then return end
+    state.round.phase = Constant.PHASE.GAME_OVER
+end
+
 --- 玩家结算后弃牌 (二!)
 ---@param indices number[]
 function GameController.PlayerPostDiscard(indices)
