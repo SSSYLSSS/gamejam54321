@@ -32,7 +32,11 @@ local function getEffectId(rank, isJoker)
     if rank == 1 then return Constant.EFFECT.ACE_DOUBLE end
     if rank == 7 then return Constant.EFFECT.SEVEN_IMMUNE end
     if rank == 8 then return Constant.EFFECT.EIGHT_REDUCE end
+    if rank == 9 then return Constant.EFFECT.NINE_FLEX end
+    if rank == 10 then return Constant.EFFECT.TEN_BONUS end
     if rank == 11 then return Constant.EFFECT.JACK_DRAW end
+    if rank == 12 then return Constant.EFFECT.QUEEN_NULLIFY end
+    if rank == 13 then return Constant.EFFECT.KING_BONUS end
     return Constant.EFFECT.NONE
 end
 

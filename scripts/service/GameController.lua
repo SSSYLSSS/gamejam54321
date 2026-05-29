@@ -174,14 +174,14 @@ function GameController.PlayerDiscard(indices)
     return PhaseManager.PlayerDiscard(state, indices)
 end
 
---- 玩家J效果: 选择牌堆抽牌
----@param source string "discard" / "deck"
+--- 玩家J效果: 从弃牌堆抽牌
+---@param source string|nil 向后兼容, 忽略
 ---@return boolean success
 ---@return string|nil errMsg
 ---@return table|nil card
 function GameController.PlayerJackPick(source)
     if not state then return false, "游戏未初始化", nil end
-    local success, err, card = EffectSystem.PlayerJackPick(state.player, state.round, source)
+    local success, err, card = EffectSystem.PlayerJackPick(state.player, state.round, nil)
     if success and state.player.pendingJackPicks <= 0 then
         -- J效果全部处理完，恢复正常子阶段
         state.round.subPhase = Constant.SUB_PHASE.PLAYER_TURN

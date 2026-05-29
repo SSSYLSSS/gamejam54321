@@ -89,14 +89,6 @@ function PhaseManager.PlayerDiscard(gameState, discardIndices)
         return false, string.format("最多弃置 %d 张牌", maxDiscard)
     end
 
-    -- 检查7
-    for _, idx in ipairs(discardIndices) do
-        local card = player.hand[idx]
-        if card and card.rank == 7 then
-            return false, "7 无法被弃置"
-        end
-    end
-
     -- 按索引从大到小排序
     table.sort(discardIndices, function(a, b) return a > b end)
 
@@ -109,6 +101,10 @@ function PhaseManager.PlayerDiscard(gameState, discardIndices)
             if card.rank == 11 then
                 jackCount = jackCount + 1
             end
+            -- 追踪弃置的10和J
+            if card.rank == 10 then
+                player.discardedTenCount = player.discardedTenCount + 1
+            end
         end
     end
 
@@ -117,8 +113,9 @@ function PhaseManager.PlayerDiscard(gameState, discardIndices)
         round:AddToDiscardPile(card)
     end
 
-    -- 记录J待处理
+    -- 记录J待处理 + 追踪J弃牌数
     player.pendingJackPicks = jackCount
+    player.discardedJackCount = player.discardedJackCount + jackCount
 
     -- 非J弃牌正常补牌
     local normalDrawCount = #discarded - jackCount
@@ -131,7 +128,7 @@ function PhaseManager.PlayerDiscard(gameState, discardIndices)
 
     gameState:AddLog(string.format("弃置 %d 张, 正常补牌 %d 张", #discarded, normalDrawCount))
     if jackCount > 0 then
-        gameState:AddLog(string.format("J 弃置效果: 需选择牌堆随机抽牌 %d 次", jackCount))
+        gameState:AddLog(string.format("J 弃置效果: 需从弃牌堆随机抽牌 %d 次", jackCount))
         round.subPhase = Constant.SUB_PHASE.JACK_PICK
     end
 
@@ -146,11 +143,11 @@ function PhaseManager.AITurn(gameState)
 
     local aiIndices = AISystem.DecideDiscard(ai.hand, round.turnIndex)
 
-    -- 过滤掉7、限制数量
+    -- 限制数量
     local validIndices = {}
     for _, idx in ipairs(aiIndices) do
         local card = ai.hand[idx]
-        if card and card.rank ~= 7 then
+        if card then
             table.insert(validIndices, idx)
         end
     end
@@ -170,6 +167,10 @@ function PhaseManager.AITurn(gameState)
             if card.rank == 11 then
                 jackCount = jackCount + 1
             end
+            -- 追踪弃置的10和J
+            if card.rank == 10 then
+                ai.discardedTenCount = ai.discardedTenCount + 1
+            end
         end
     end
 
@@ -178,8 +179,9 @@ function PhaseManager.AITurn(gameState)
         round:AddToDiscardPile(card)
     end
 
-    -- J 效果
+    -- J 效果 + 追踪J弃牌数
     ai.pendingJackPicks = jackCount
+    ai.discardedJackCount = ai.discardedJackCount + jackCount
     EffectSystem.AIJackPick(ai, round)
 
     -- 非J正常补牌
@@ -221,7 +223,7 @@ end
 ---@param gameState table GameState
 ---@return table result
 function PhaseManager.DoSettlement(gameState)
-    local result = RuleEngine.Settle(gameState.player.hand, gameState.ai.hand)
+    local result = RuleEngine.Settle(gameState.player.hand, gameState.ai.hand, gameState.player, gameState.ai)
 
     -- 更新胜场
     if result.winner == "player" then

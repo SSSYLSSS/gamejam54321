@@ -35,7 +35,6 @@ local COLORS = {
 ---@return string|nil
 local function getCardEffectText(card)
     if not card then return nil end
-
     if Card.IsJoker(card) then
         if card.rank == 14 then
             return "小王: 点数可选0~13, 移除对方一张牌"
@@ -43,20 +42,18 @@ local function getCardEffectText(card)
             return "大王: 点数可选0~13, 可将自己一张牌视为任意点数"
         end
     end
-
     local rank = card.rank
     if rank == 1 then return "A: 结算时翻倍对方同花色牌点数" end
-    if rank == 7 then return "7: 不可弃置/修改, 3张7触发特殊规则" end
+    if rank == 7 then return "7: 不可被改变点数/删除, 3张7触发特殊胜负" end
     if rank == 8 then return "8: 使自己普通牌(2~6)点数各减1" end
-    if rank == 11 then return "J: 弃置时可从牌堆随机抽一张牌" end
-    if rank == 12 then return "Q: 0点花牌, 无特效" end
-    if rank == 13 then return "K: 0点花牌, 无特效" end
+    if rank == 9 then return "9: 结算时点数可视为0或9" end
+    if rank == 10 then return "10: 若弃置过此牌, 最终点数+1" end
+    if rank == 11 then return "J: 弃置时从弃牌堆抽牌; 结算前翻倍对方普通牌" end
+    if rank == 12 then return "Q: 结算时使对方点数最小的牌变为0" end
+    if rank == 13 then return "K: 手中每张K最终点数+1" end
     if rank >= 2 and rank <= 6 then
         return string.format("%d: 普通牌, %d点", rank, rank)
     end
-    if rank == 9 then return "9: 稀有牌, 9点" end
-    if rank == 10 then return "10: 稀有牌, 10点" end
-
     return nil
 end
 
@@ -97,7 +94,7 @@ function CardWidget.Create(card, opts)
                 alignItems = "center",
                 children = {
                     UI.Label {
-                        text = "🂠",
+                        text = "?",
                         fontSize = isAI and 24 or 30,
                         fontColor = { 120, 140, 180, 255 },
                         textAlign = "center",
@@ -112,7 +109,7 @@ function CardWidget.Create(card, opts)
 
         if Card.IsJoker(card) then
             suitColor = COLORS.jokerPurple
-            suitSymbol = "🃏"
+            suitSymbol = "★"
             rankText = card.rank == 14 and "小" or "大"
         else
             suitColor = Constant.SUIT_COLORS[card.suit] or COLORS.black
@@ -139,8 +136,8 @@ function CardWidget.Create(card, opts)
     local cardPanel = UI.Button {
         width = w,
         height = h,
-        backgroundColor = bgColor,
-        hoverBackgroundColor = hoverBg,
+        backgroundColor = card and bgColor or COLORS.cardBack,
+        hoverBackgroundColor = card and hoverBg or { 90, 110, 150, 255 },
         pressedBackgroundColor = isSelected and { 140, 190, 240, 255 } or { 240, 240, 230, 255 },
         borderRadius = 8,
         borderWidth = borderWidth,
@@ -150,18 +147,30 @@ function CardWidget.Create(card, opts)
         alignItems = "center",
         gap = 2,
         pointerEvents = (selectable or (card ~= nil)) and "auto" or "none",
+        transition = "scale 0.15s easeOut",
+        transformOrigin = "center",
         children = cardContent,
         onClick = (selectable and opts.onClick) and opts.onClick or nil,
     }
 
-    -- 有卡牌数据且不是AI的牌背时，包裹 Tooltip 显示效果提示
+    -- 悬停放大效果 (仅玩家手牌)
+    if not isAI then
+        cardPanel:OnEvent("pointerenter", function()
+            cardPanel:SetStyle({ scale = 1.2 })
+        end)
+        cardPanel:OnEvent("pointerleave", function()
+            cardPanel:SetStyle({ scale = 1.0 })
+        end)
+    end
+
+    -- 有卡牌数据且不是AI的牌时，包裹 Tooltip 显示效果提示
     local effectText = card and getCardEffectText(card) or nil
     if effectText and not isAI then
         return UI.Tooltip {
             content = effectText,
             position = "top",
-            delay = 0.2,
-            maxWidth = 280,
+            delay = 0.3,
+            maxWidth = 260,
             children = { cardPanel },
         }
     end

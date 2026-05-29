@@ -72,9 +72,13 @@ Constant.CATEGORY = {
 Constant.EFFECT = {
     NONE            = "none",
     ACE_DOUBLE      = "ace_double",       -- A: 翻倍对手同花色
-    SEVEN_IMMUNE    = "seven_immune",     -- 7: 不可被修改/移除
+    SEVEN_IMMUNE    = "seven_immune",     -- 7: 不可被改变点数/删除, 可弃置
     EIGHT_REDUCE    = "eight_reduce",     -- 8: 降低自己普通牌1点
-    JACK_DRAW       = "jack_draw",        -- J: 弃置时从牌堆抽牌
+    NINE_FLEX       = "nine_flex",        -- 9: 点数可视为0或9
+    TEN_BONUS       = "ten_bonus",        -- 10: 若弃置过, 最终+1
+    JACK_DRAW       = "jack_draw",        -- J: 弃置时从弃牌堆抽牌 + 结算翻倍对方普通牌
+    QUEEN_NULLIFY   = "queen_nullify",    -- Q: 使对方最小点数牌变0
+    KING_BONUS      = "king_bonus",       -- K: 手中有K则最终+1
     JOKER_SMALL     = "joker_small",      -- 小王: 移除对方一张牌
     JOKER_BIG       = "joker_big",        -- 大王: 选择自己任意点数
 }

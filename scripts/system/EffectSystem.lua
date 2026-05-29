@@ -14,10 +14,10 @@ local EffectSystem = {}
 -- J 效果: 弃置时从选定牌堆随机抽牌
 -- ============================================================================
 
---- 执行玩家 J 效果: 从指定牌堆随机抽一张
+--- 执行玩家 J 效果: 从弃牌堆随机抽一张
 ---@param playerState table PlayerState
 ---@param roundState table RoundState
----@param source string "discard" / "deck"
+---@param source string|nil "discard"(默认) / "deck"(向后兼容)
 ---@return boolean success
 ---@return string|nil errMsg
 ---@return table|nil drawnCard
@@ -26,17 +26,16 @@ function EffectSystem.PlayerJackPick(playerState, roundState, source)
         return false, "没有待处理的J效果", nil
     end
 
+    -- J 新规则: 优先从弃牌堆抽, 弃牌堆空则从抽牌堆
     local card
-    if source == "discard" then
+    if roundState:GetDiscardCount() > 0 then
         card = roundState:DrawRandomFromDiscard()
-    elseif source == "deck" then
-        card = DeckSystem.DrawRandom(playerState.deck)
     else
-        return false, "无效来源", nil
+        card = DeckSystem.DrawRandom(playerState.deck)
     end
 
     if not card then
-        return false, "该牌堆为空", nil
+        return false, "牌堆为空", nil
     end
 
     playerState:AddToHand(card)
