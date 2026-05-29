@@ -160,6 +160,13 @@ function GameController.GetGameWinner()
     return state:GetGameWinner()
 end
 
+--- 获取玩家保留牌(用于ROUND_END阶段展示)
+---@return table|nil card
+function GameController.GetPlayerKeepCard()
+    if not state then return nil end
+    return state.player.keepCard
+end
+
 --- 玩家手中是否有鬼牌
 ---@return boolean
 function GameController.PlayerHasJoker()

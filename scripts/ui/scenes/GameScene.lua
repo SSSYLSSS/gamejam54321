@@ -484,6 +484,27 @@ function GameScene._RefreshPlayerHand()
     local phase = GameController.GetPhase()
     local subPhase = GameController.GetSubPhase()
 
+    -- ROUND_END 阶段: 手牌已清空, 若有保留牌则居中展示
+    if phase == Constant.PHASE.ROUND_END or phase == Constant.PHASE.GAME_OVER then
+        local keepCard = GameController.GetPlayerKeepCard()
+        if keepCard then
+            local wrapper = UI.Panel {
+                alignItems = "center",
+                gap = 6,
+                children = {
+                    UI.Label {
+                        text = "已保留至下局",
+                        fontSize = 12,
+                        fontColor = Colors.gold,
+                    },
+                    CardWidget.Create(keepCard, {}),
+                }
+            }
+            panel:AddChild(wrapper)
+        end
+        return
+    end
+
     local selectable = (phase == Constant.PHASE.DRAW_FIVE or
                        phase == Constant.PHASE.DRAW_FOUR or
                        phase == Constant.PHASE.DRAW_THREE or
