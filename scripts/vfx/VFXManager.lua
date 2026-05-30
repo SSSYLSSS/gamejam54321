@@ -297,7 +297,7 @@ function HandleVFXRender(eventType, eventData)
         CardGlow.RenderAll(vg, cardGlowList, time)
     end
 
-    -- 层级2.5: 图片辉光 (中心点光源 + 呼吸效果 + 旋转)
+    -- 层级2.5: 图片辉光 (中心点光源 + 呼吸效果 + 旋转, 无背景副本)
     if #bloomImages > 0 then
         for _, bi in ipairs(bloomImages) do
             nvgSave(vg)
@@ -308,36 +308,28 @@ function HandleVFXRender(eventType, eventData)
                 nvgRotate(vg, bi.rotate * math.pi / 180)
             end
 
-            -- 原始图片先渲染
-            nvgGlobalAlpha(vg, 1.0)
-            local pat = nvgImagePattern(vg, -bi.w * 0.5, -bi.h * 0.5, bi.w, bi.h, 0, bi.handle, 1.0)
-            nvgBeginPath(vg)
-            nvgRect(vg, -bi.w * 0.5, -bi.h * 0.5, bi.w, bi.h)
-            nvgFillPaint(vg, pat)
-            nvgFill(vg)
-
-            -- 点光源: 呼吸 + 旋转
+            -- 点光源: 呼吸 + 旋转 (不再渲染图片副本)
             local intensity = bi.intensity
             local glowStrength = math.max(0, intensity - 1.0)
-            -- 呼吸: sin波动 (周期约1.5s)
-            local breath = 0.6 + 0.4 * math.sin(time * 4.2)
-            local glowAlpha = 0.5 * glowStrength * breath
+            -- 呼吸: 减弱振幅 (0.85~1.0 微弱波动)
+            local breath = 0.85 + 0.15 * math.sin(time * 3.0)
+            local glowAlpha = 0.6 * glowStrength * breath
             -- 旋转角度
-            local rotAngle = time * 1.8  -- 弧度/秒
+            local rotAngle = time * 1.8
 
             nvgSave(vg)
             nvgRotate(vg, rotAngle)
 
-            -- 径向光源: 用椭圆形RadialGradient模拟旋转光斑
-            local radius = math.max(bi.w, bi.h) * 0.45 * (0.8 + 0.2 * breath)
-            local radX = radius * 1.3  -- 椭圆长轴
-            local radY = radius * 0.7  -- 椭圆短轴
+            -- 放大光源范围
+            local radius = math.max(bi.w, bi.h) * 0.7 * (0.9 + 0.1 * breath)
+            local radX = radius * 1.3
+            local radY = radius * 0.7
 
             -- 外层大范围柔光
             nvgBeginPath(vg)
-            nvgEllipse(vg, 0, 0, radX * 1.6, radY * 1.6)
-            local outerGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 1.2,
-                nvgRGBAf(1.0, 0.92, 0.7, glowAlpha * 0.4),
+            nvgEllipse(vg, 0, 0, radX * 1.8, radY * 1.8)
+            local outerGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 1.5,
+                nvgRGBAf(1.0, 0.92, 0.7, glowAlpha * 0.35),
                 nvgRGBAf(1.0, 0.85, 0.5, 0))
             nvgFillPaint(vg, outerGrad)
             nvgFill(vg)
@@ -345,8 +337,8 @@ function HandleVFXRender(eventType, eventData)
             -- 核心亮点
             nvgBeginPath(vg)
             nvgEllipse(vg, 0, 0, radX, radY)
-            local coreGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 0.5,
-                nvgRGBAf(1.0, 0.98, 0.9, glowAlpha * 0.9),
+            local coreGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 0.6,
+                nvgRGBAf(1.0, 0.98, 0.9, glowAlpha * 0.8),
                 nvgRGBAf(1.0, 0.9, 0.6, 0))
             nvgFillPaint(vg, coreGrad)
             nvgFill(vg)
