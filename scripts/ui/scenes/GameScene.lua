@@ -1753,6 +1753,7 @@ function GameScene._UpdateCountdownOverlay()
                 position = "absolute",
                 justifyContent = "center",
                 alignItems = "center",
+                paddingBottom = 120,
                 opacity = 1.0,
                 children = {
                     UI.Label {

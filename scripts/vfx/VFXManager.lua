@@ -154,18 +154,18 @@ function VFXManager.EmitWinParticles(cx, cy)
         { x = sw, y = sh },
     }
     for _, corner in ipairs(corners) do
-        particles:EmitToward(corner.x, corner.y, cx, cy, 30, {
+        particles:EmitToward(corner.x, corner.y, cx, cy, 50, {
             r = 1.0, g = 0.85, b = 0.2,
             speed = 700,
-            life = 1.8,
+            life = 3.0,
             radius = 7,
             spread = 0.5,
         })
         -- 追加白色小粒子
-        particles:EmitToward(corner.x, corner.y, cx, cy, 18, {
+        particles:EmitToward(corner.x, corner.y, cx, cy, 30, {
             r = 1.0, g = 1.0, b = 0.9,
             speed = 500,
-            life = 1.2,
+            life = 2.5,
             radius = 4,
             spread = 0.4,
         })
@@ -186,10 +186,10 @@ function VFXManager.EmitLoseParticles(cx, cy)
         { x = sw, y = sh },
     }
     for _, corner in ipairs(corners) do
-        particles:EmitToward(corner.x, corner.y, cx, cy, 22, {
+        particles:EmitToward(corner.x, corner.y, cx, cy, 40, {
             r = 0.8, g = 0.2, b = 0.2,
             speed = 500,
-            life = 1.2,
+            life = 2.5,
             radius = 6,
             spread = 0.5,
         })
