@@ -66,8 +66,8 @@ local PAGES = {
         icon = "⚡",
         content = {
             { type = "card", rank = "J", desc = "弃置时从弃牌堆抽1张牌\n结算时翻倍对方普通牌" },
-            { type = "card", rank = "Q", desc = "使对方最小点数牌变为0点" },
-            { type = "card", rank = "K", desc = "结算时若手中有K则+1点" },
+            { type = "card", rank = "Q", desc = "使对方最大普通牌点数×2(可叠加)" },
+            { type = "card", rank = "K", desc = "对方点数向上取整到十位\n己方-5后向下取整到十位" },
             { type = "gap" },
             { type = "highlight", value = "三张7特殊规则：手持三张7直接获胜！" },
         }
@@ -76,12 +76,12 @@ local PAGES = {
         title = "鬼牌效果",
         icon = "🃏",
         content = {
-            { type = "text", value = "鬼牌在抽牌阶段结束后立即触发：" },
+            { type = "text", value = "鬼牌在抽牌阶段结束后触发效果：" },
             { type = "gap" },
-            { type = "card", rank = "小王", desc = "随机移除对方一张手牌" },
-            { type = "card", rank = "大王", desc = "选择自己的任意点数(1-13)" },
+            { type = "card", rank = "小王", desc = "选择移除对方一张牌(看不到牌面)\n点数自动选择最优(0~13)" },
+            { type = "card", rank = "大王", desc = "选一张手牌设为任意点数\n大王自身也选任意点数(0~13)" },
             { type = "gap" },
-            { type = "text", value = "鬼牌效果触发后从手中移除，不计入点数。" },
+            { type = "text", value = "鬼牌效果触发后仍保留在手中，以选定点数计入总分。" },
         }
     },
     {
