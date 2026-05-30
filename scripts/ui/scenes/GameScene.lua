@@ -1362,7 +1362,7 @@ local function buildEffectDetails(hand, details, isPlayer)
     -- K 效果
     if details.kingApplied then
         table.insert(effects, UI.Label {
-            text = "K: 对方点数四舍五入到十位, 己方-5后四舍五入到十位",
+            text = "K: 对方点数向上取整到十位, 己方-5后向下取整到十位",
             fontSize = 11,
             fontColor = { 255, 160, 60, 255 },
         })
