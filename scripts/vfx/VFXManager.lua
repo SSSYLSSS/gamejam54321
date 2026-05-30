@@ -34,6 +34,8 @@ local bloomImages = {}
 local imageCache = {}
 ---@type table[] 光线特效列表 {x1, y1, x2, y2, r, g, b, elapsed, duration}
 local lightBeams = {}
+---@type table[] 飘字列表 {x, y, text, r, g, b, elapsed, duration}
+local floatingTexts = {}
 
 -- ============================================================================
 -- 生命周期
@@ -81,6 +83,18 @@ function VFXManager.Update(dt)
         end
     end
 
+    -- 更新飘字
+    local fi = 1
+    while fi <= #floatingTexts do
+        local ft = floatingTexts[fi]
+        ft.elapsed = ft.elapsed + dt
+        if ft.elapsed >= ft.duration then
+            table.remove(floatingTexts, fi)
+        else
+            fi = fi + 1
+        end
+    end
+
     -- 更新飞行卡牌
     local i = 1
     while i <= #flyingCards do
@@ -120,14 +134,14 @@ function VFXManager.EmitWinParticles(x, y)
         r = 1.0, g = 0.85, b = 0.2,
         speed = 250,
         life = 2.0,
-        radius = 5,
+        radius = 8,
     })
     -- 追加一些白色小粒子
     particles:Emit(x, y, 30, {
         r = 1.0, g = 1.0, b = 0.9,
         speed = 150,
         life = 1.2,
-        radius = 2,
+        radius = 4,
     })
 end
 
@@ -140,7 +154,7 @@ function VFXManager.EmitLoseParticles(x, y)
         r = 0.8, g = 0.2, b = 0.2,
         speed = 120,
         life = 1.0,
-        radius = 3,
+        radius = 5,
     })
 end
 
@@ -161,7 +175,7 @@ function VFXManager.EmitJackEffect(x, y)
         r = 0.5, g = 0.3, b = 1.0,
         speed = 180,
         life = 1.0,
-        radius = 4,
+        radius = 7,
     })
 end
 
@@ -274,6 +288,30 @@ function VFXManager.ClearLightBeams()
     lightBeams = {}
 end
 
+--- 发射飘字 (从指定位置向上浮动并淡出)
+---@param x number 中心X
+---@param y number 起始Y
+---@param text string 文字内容
+---@param opts table|nil {r, g, b, duration, fontSize}
+function VFXManager.EmitFloatingText(x, y, text, opts)
+    opts = opts or {}
+    table.insert(floatingTexts, {
+        x = x, y = y,
+        text = text,
+        r = opts.r or 1.0,
+        g = opts.g or 1.0,
+        b = opts.b or 1.0,
+        fontSize = opts.fontSize or 18,
+        duration = opts.duration or 1.2,
+        elapsed = 0,
+    })
+end
+
+--- 清除所有飘字
+function VFXManager.ClearFloatingTexts()
+    floatingTexts = {}
+end
+
 -- ============================================================================
 -- NanoVG 渲染回调 (内部)
 -- ============================================================================
@@ -308,27 +346,19 @@ function HandleVFXRender(eventType, eventData)
                 nvgRotate(vg, bi.rotate * math.pi / 180)
             end
 
-            -- 点光源: 呼吸 + 旋转 (不再渲染图片副本)
+            -- 点光源: 呼吸 (无旋转)
             local intensity = bi.intensity
             local glowStrength = math.max(0, intensity - 1.0)
-            -- 呼吸: 减弱振幅 (0.85~1.0 微弱波动)
             local breath = 0.85 + 0.15 * math.sin(time * 3.0)
             local glowAlpha = 0.6 * glowStrength * breath
-            -- 旋转角度
-            local rotAngle = time * 1.8
 
-            nvgSave(vg)
-            nvgRotate(vg, rotAngle)
+            -- 圆形光源 (缩小)
+            local radius = math.max(bi.w, bi.h) * 0.5 * (0.9 + 0.1 * breath)
 
-            -- 放大光源范围
-            local radius = math.max(bi.w, bi.h) * 0.7 * (0.9 + 0.1 * breath)
-            local radX = radius * 1.3
-            local radY = radius * 0.7
-
-            -- 外层大范围柔光
+            -- 外层柔光
             nvgBeginPath(vg)
-            nvgEllipse(vg, 0, 0, radX * 1.8, radY * 1.8)
-            local outerGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 1.5,
+            nvgCircle(vg, 0, 0, radius * 1.5)
+            local outerGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 1.3,
                 nvgRGBAf(1.0, 0.92, 0.7, glowAlpha * 0.35),
                 nvgRGBAf(1.0, 0.85, 0.5, 0))
             nvgFillPaint(vg, outerGrad)
@@ -336,14 +366,13 @@ function HandleVFXRender(eventType, eventData)
 
             -- 核心亮点
             nvgBeginPath(vg)
-            nvgEllipse(vg, 0, 0, radX, radY)
-            local coreGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 0.6,
+            nvgCircle(vg, 0, 0, radius * 0.6)
+            local coreGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 0.4,
                 nvgRGBAf(1.0, 0.98, 0.9, glowAlpha * 0.8),
                 nvgRGBAf(1.0, 0.9, 0.6, 0))
             nvgFillPaint(vg, coreGrad)
             nvgFill(vg)
 
-            nvgRestore(vg)
             nvgRestore(vg)
         end
     end
@@ -394,6 +423,37 @@ function HandleVFXRender(eventType, eventData)
             nvgLineCap(vg, NVG_ROUND)
             nvgStroke(vg)
 
+            nvgRestore(vg)
+        end
+    end
+
+    -- 层级2.9: 飘字 (技能影响文字提示)
+    if #floatingTexts > 0 then
+        nvgFontFace(vg, "sans")
+        nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        for _, ft in ipairs(floatingTexts) do
+            local progress = ft.elapsed / ft.duration
+            -- 上浮距离
+            local offsetY = -40 * progress
+            -- 淡入淡出: 前15%快速亮起, 后40%淡出
+            local alpha
+            if progress < 0.15 then
+                alpha = progress / 0.15
+            elseif progress > 0.6 then
+                alpha = 1.0 - (progress - 0.6) / 0.4
+            else
+                alpha = 1.0
+            end
+            alpha = math.max(0, math.min(1, alpha))
+
+            nvgSave(vg)
+            nvgFontSize(vg, ft.fontSize)
+            -- 描边/阴影
+            nvgFillColor(vg, nvgRGBAf(0, 0, 0, alpha * 0.6))
+            nvgText(vg, ft.x + 1, ft.y + offsetY + 1, ft.text)
+            -- 正文
+            nvgFillColor(vg, nvgRGBAf(ft.r, ft.g, ft.b, alpha))
+            nvgText(vg, ft.x, ft.y + offsetY, ft.text)
             nvgRestore(vg)
         end
     end

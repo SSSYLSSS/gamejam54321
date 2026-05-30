@@ -1583,6 +1583,18 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
 
     -- 1) AI特殊牌 → 影响玩家牌 (从AI牌发射到玩家牌)
     if #affectedIndices > 0 then
+        -- 确定效果描述文字
+        local effectText = ""
+        if aiCard.rank == 11 then
+            effectText = "点数-1"
+        elseif aiCard.rank == 12 then
+            effectText = "×2"
+        elseif aiCard.rank == 1 then
+            effectText = "×2"
+        elseif aiCard.rank == 8 then
+            effectText = "普通牌+2"
+        end
+
         for _, pIdx in ipairs(affectedIndices) do
             local destX = playerStartX + (pIdx - 1) * (playerCardW + 12) + playerCardW * 0.5
             local destY = playerY
@@ -1590,6 +1602,14 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
                 r = beamColor.r, g = beamColor.g, b = beamColor.b,
                 duration = 1.0,
             })
+            -- 在被影响的玩家牌上方飘字
+            if effectText ~= "" then
+                VFXManager.EmitFloatingText(destX, destY - playerCardH * 0.5 - 10, effectText, {
+                    r = beamColor.r, g = beamColor.g, b = beamColor.b,
+                    duration = 1.4,
+                    fontSize = 16,
+                })
+            end
         end
     end
 
@@ -1597,24 +1617,25 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
     local aiCard2 = aiCard  -- 被翻开的AI牌
     for pIdx, pCard in ipairs(playerHand) do
         local shouldBeam = false
-        local pBeamColor = { r = 0.3, g = 0.8, b = 1.0 }  -- 默认青色
+        local pBeamColor = { r = 0.3, g = 0.8, b = 1.0 }
+        local pEffectText = ""
 
         if pCard.rank == 11 and Card.IsNormal(aiCard2) then
-            -- 玩家J影响AI普通牌
             shouldBeam = true
             pBeamColor = { r = 0.3, g = 0.5, b = 1.0 }
+            pEffectText = "点数-1"
         elseif pCard.rank == 12 and Card.IsNormal(aiCard2) then
-            -- 玩家Q影响AI最大普通牌(简化：翻开普通牌就发射)
             shouldBeam = true
             pBeamColor = { r = 0.5, g = 0.2, b = 1.0 }
+            pEffectText = "×2"
         elseif pCard.rank == 1 and aiCard2.suit and pCard.suit == aiCard2.suit then
-            -- 玩家A影响AI同花色的牌
             shouldBeam = true
             pBeamColor = { r = 0.2, g = 1.0, b = 0.5 }
+            pEffectText = "×2"
         elseif pCard.rank == 8 and Card.IsNormal(aiCard2) then
-            -- 玩家8影响AI普通牌
             shouldBeam = true
             pBeamColor = { r = 0.2, g = 0.9, b = 0.7 }
+            pEffectText = "普通牌-1"
         end
 
         if shouldBeam then
@@ -1624,6 +1645,14 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
                 r = pBeamColor.r, g = pBeamColor.g, b = pBeamColor.b,
                 duration = 1.0,
             })
+            -- 在被影响的AI牌上方飘字
+            if pEffectText ~= "" then
+                VFXManager.EmitFloatingText(srcX, srcY - aiCardH * 0.5 - 10, pEffectText, {
+                    r = pBeamColor.r, g = pBeamColor.g, b = pBeamColor.b,
+                    duration = 1.4,
+                    fontSize = 16,
+                })
+            end
         end
     end
 end

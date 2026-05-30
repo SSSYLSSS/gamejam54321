@@ -81,7 +81,7 @@ function ParticleSystem:EmitUpward(x, y, count)
             vy = -(100 + math.random() * 80),
             life = 0.8 + math.random() * 0.4,
             maxLife = 1.0,
-            radius = 2 + math.random() * 2,
+            radius = 4 + math.random() * 3,
             r = 0.4,
             g = 0.6,
             b = 1.0,
