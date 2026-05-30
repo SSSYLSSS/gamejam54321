@@ -13,6 +13,7 @@ local AISystem = require("system.AISystem")
 local StatsSystem = require("system.StatsSystem")
 local SaveSystem = require("system.SaveSystem")
 local VFXManager = require("vfx.VFXManager")
+local GameLogViewer = require("ui.components.GameLogViewer")
 
 local GameScene = {}
 
@@ -160,13 +161,10 @@ function GameScene.Update(dt)
             GameScene._UpdateSettlementOverlay()
         end
     else
-        -- 全部翻完后等待1.5秒自动进入下一阶段
-        if not anim.autoAdvanceTimer then
-            anim.autoAdvanceTimer = 0
-        end
-        anim.autoAdvanceTimer = anim.autoAdvanceTimer + dt
-        if anim.autoAdvanceTimer >= 1.5 then
-            GameScene._CloseSettlementAndAdvance()
+        -- 全部翻完后显示"继续"按钮，等待玩家手动点击
+        if not anim.showedContinue then
+            anim.showedContinue = true
+            GameScene._ShowSettlementContinueBtn()
         end
     end
 end
@@ -174,6 +172,14 @@ end
 --- 处理 ESC 键
 ---@return boolean handled
 function GameScene.HandleEscape()
+    -- 日志弹窗
+    if uiRoot then
+        local logOverlay = uiRoot:FindById("gameLogOverlay")
+        if logOverlay then
+            GameScene._CloseGameLog()
+            return true
+        end
+    end
     if viewingPile then
         GameScene._ClosePileView()
         return true
@@ -227,7 +233,7 @@ function GameScene._CreateTopBar()
             },
             UI.Panel {
                 flexDirection = "row",
-                gap = 16,
+                gap = 12,
                 alignItems = "center",
                 children = {
                     UI.Label {
@@ -241,6 +247,13 @@ function GameScene._CreateTopBar()
                         text = "第 0 局",
                         fontSize = 14,
                         fontColor = Colors.textDim,
+                    },
+                    UI.Button {
+                        text = "日志",
+                        fontSize = 11,
+                        height = 28,
+                        fontColor = { 180, 190, 210, 255 },
+                        onClick = function() GameScene._ShowGameLog() end,
                     },
                 }
             },
@@ -1294,6 +1307,36 @@ function GameScene._BuildSettlementContent()
     }
 end
 
+--- 在结算弹窗底部显示"继续"按钮
+function GameScene._ShowSettlementContinueBtn()
+    if not uiRoot then return end
+    local overlay = uiRoot:FindById("settlementOverlay")
+    if not overlay then return end
+    local content = overlay:FindById("settlementContent")
+    if not content then return end
+
+    content:AddChild(UI.Panel {
+        width = "100%",
+        height = 1,
+        backgroundColor = Colors.menuBorder,
+        marginTop = 4,
+    })
+    content:AddChild(UI.Button {
+        text = "继续",
+        width = "80%",
+        height = 38,
+        fontSize = 15,
+        fontColor = Colors.accent,
+        backgroundColor = { 40, 55, 80, 220 },
+        borderRadius = 8,
+        borderWidth = 1,
+        borderColor = { Colors.accent[1], Colors.accent[2], Colors.accent[3], 120 },
+        onClick = function()
+            GameScene._CloseSettlementAndAdvance()
+        end,
+    })
+end
+
 --- 关闭结算弹窗
 function GameScene._CloseSettlementOverlay()
     settlementAnim = nil
@@ -1679,6 +1722,30 @@ function GameScene._EndTransition()
     GameScene.SetInfo(string.format("选择要弃置的牌（至多%d张），或跳过",
         GameController.GetMaxDiscard()))
     GameScene.Refresh()
+end
+
+-- ============================================================================
+-- 内部: 游戏日志查看
+-- ============================================================================
+
+--- 显示游戏日志弹窗
+function GameScene._ShowGameLog()
+    if not uiRoot then return end
+    -- 防止重复打开
+    local existing = uiRoot:FindById("gameLogOverlay")
+    if existing then return end
+
+    local overlay = GameLogViewer.Create(function()
+        GameScene._CloseGameLog()
+    end)
+    uiRoot:AddChild(overlay)
+end
+
+--- 关闭游戏日志弹窗
+function GameScene._CloseGameLog()
+    if not uiRoot then return end
+    local overlay = uiRoot:FindById("gameLogOverlay")
+    if overlay then overlay:Remove() end
 end
 
 return GameScene

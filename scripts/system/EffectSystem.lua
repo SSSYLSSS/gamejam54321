@@ -46,7 +46,9 @@ end
 --- AI 的 J 效果处理(弃置时自动从自己牌堆抽牌)
 ---@param aiState table PlayerState
 ---@param roundState table RoundState (保留参数兼容)
+---@return table[] drawnCards 抽到的牌列表
 function EffectSystem.AIJackPick(aiState, roundState)
+    local drawn = {}
     while aiState.pendingJackPicks > 0 do
         local card
         if aiState:GetDiscardCount() > 0 then
@@ -56,9 +58,11 @@ function EffectSystem.AIJackPick(aiState, roundState)
         end
         if card then
             aiState:AddToHand(card)
+            table.insert(drawn, card)
         end
         aiState.pendingJackPicks = aiState.pendingJackPicks - 1
     end
+    return drawn
 end
 
 -- ============================================================================

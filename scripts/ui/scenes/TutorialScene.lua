@@ -18,9 +18,9 @@ local PAGES = {
         content = {
             { type = "text", value = "让手牌点数之和尽量接近 21 点！" },
             { type = "gap" },
-            { type = "highlight", value = "超过 21 点 = 爆牌，直接判负" },
+            { type = "highlight", value = "双方比较谁更接近21点，更近者获胜\n超过21点不会直接判负，但距离会更远" },
             { type = "gap" },
-            { type = "text", value = "每局双方比较点数，更接近 21 点的一方获胜。" },
+            { type = "text", value = "每局双方比较与21点的距离，更接近的一方获胜。" },
             { type = "text", value = "先赢 3 局者赢得整场比赛。" },
         }
     },
@@ -381,6 +381,15 @@ function TutorialScene.Build(onBack)
                         alignItems = "center",
                         children = {
                             prevBtn,
+                            UI.Button {
+                                text = "返回菜单",
+                                height = 34,
+                                fontSize = 12,
+                                fontColor = Colors.textDim,
+                                onClick = function()
+                                    onBack()
+                                end,
+                            },
                             nextBtn,
                         }
                     },

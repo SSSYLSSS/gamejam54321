@@ -126,7 +126,12 @@ function PhaseManager.PlayerDiscard(gameState, discardIndices)
         end
     end
 
-    gameState:AddLog(string.format("弃置 %d 张, 正常补牌 %d 张", #discarded, normalDrawCount))
+    if #discarded > 0 then
+        local names = {}
+        for _, c in ipairs(discarded) do table.insert(names, Card.GetName(c)) end
+        gameState:AddLog(string.format("玩家弃置: %s", table.concat(names, ", ")))
+    end
+    gameState:AddLog(string.format("玩家补牌 %d 张", normalDrawCount))
     if jackCount > 0 then
         gameState:AddLog(string.format("J 弃置效果: 需从弃牌堆随机抽牌 %d 次", jackCount))
         round.subPhase = Constant.SUB_PHASE.JACK_PICK
@@ -182,7 +187,12 @@ function PhaseManager.AITurn(gameState)
     -- J 效果 + 追踪J弃牌数
     ai.pendingJackPicks = jackCount
     ai.discardedJackCount = ai.discardedJackCount + jackCount
-    EffectSystem.AIJackPick(ai, round)
+    local jackDrawn = EffectSystem.AIJackPick(ai, round)
+    if #jackDrawn > 0 then
+        local jNames = {}
+        for _, c in ipairs(jackDrawn) do table.insert(jNames, Card.GetName(c)) end
+        gameState:AddLog(string.format("AI J效果抽牌: %s", table.concat(jNames, ", ")))
+    end
 
     -- 非J正常补牌
     local normalDrawCount = #discarded - jackCount
@@ -193,7 +203,13 @@ function PhaseManager.AITurn(gameState)
         end
     end
 
-    gameState:AddLog(string.format("AI 弃置 %d 张, 补牌 %d 张", #discarded, normalDrawCount))
+    -- 记录AI弃置的具体牌
+    if #discarded > 0 then
+        local names = {}
+        for _, c in ipairs(discarded) do table.insert(names, Card.GetName(c)) end
+        gameState:AddLog(string.format("AI 弃置: %s", table.concat(names, ", ")))
+    end
+    gameState:AddLog(string.format("AI 补牌 %d 张", normalDrawCount))
 end
 
 --- 玩家弃牌后完成回合(AI行动 + 推进)
@@ -325,19 +341,25 @@ function PhaseManager.AIPostGame(gameState)
     if keepIndex and keepIndex >= 1 and keepIndex <= #ai.hand then
         local card = table.remove(ai.hand, keepIndex)
         ai:SetKeepCard(card)
+        gameState:AddLog("AI 保留至下局: " .. Card.GetName(card))
     end
 
     -- 弃置到抽牌堆(注意保留牌已移除，重新计算索引)
     table.sort(discardIndices, function(a, b) return a > b end)
     local discardCount = math.min(GameConfig.POST_DISCARD_MAX, #ai.hand)
     local removed = 0
+    local returnedNames = {}
     for _, idx in ipairs(discardIndices) do
         if removed >= discardCount then break end
         if idx >= 1 and idx <= #ai.hand then
             local card = table.remove(ai.hand, idx)
             ai:AddToDeck(card)
+            table.insert(returnedNames, Card.GetName(card))
             removed = removed + 1
         end
+    end
+    if #returnedNames > 0 then
+        gameState:AddLog("AI 放回抽牌堆: " .. table.concat(returnedNames, ", "))
     end
 
     -- 剩余放入AI自己的弃牌堆

@@ -291,4 +291,11 @@ function GameController.StartNextRound()
     PhaseManager.StartNewRound(state)
 end
 
+--- 获取游戏日志
+---@return table log
+function GameController.GetLog()
+    if not state then return {} end
+    return state.log
+end
+
 return GameController
