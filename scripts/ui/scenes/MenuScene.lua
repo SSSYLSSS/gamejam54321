@@ -54,27 +54,49 @@ function MenuScene.Build(callbacks)
     table.insert(buttons, CreateMenuButton("设置", Colors.textDim, callbacks.onSettings))
     table.insert(buttons, CreateMenuButton("退出游戏", Colors.danger, callbacks.onExit))
 
-    -- 构建children
-    local children = {
-        UI.Label {
-            text = "五!四!三!",
-            fontSize = 28,
-            fontColor = Colors.gold,
-            textAlign = "center",
-        },
-        UI.Label {
-            text = "二十一点!",
-            fontSize = 22,
-            fontColor = Colors.text,
-            textAlign = "center",
-        },
-        UI.Panel {
-            width = "80%",
-            height = 1,
-            backgroundColor = Colors.menuBorder,
-            marginVertical = 8,
-        },
+    -- 标题图片(五 四 三 21) - 大像素图在屏幕上方自由漂浮 + 倾斜
+    local smallSize = 300   -- 200 * 1.5
+    local bigSize = 500
+    local titleImages = {
+        { src = "pic/五.png", size = smallSize, x = "14%", y = "0%",  rotate = -12 },
+        { src = "pic/四.png", size = smallSize, x = "42%", y = "0%",  rotate = 0 },
+        { src = "pic/三.png", size = smallSize, x = "70%", y = "0%",  rotate = 10 },
+        { src = "pic/21.png", size = bigSize,   x = "38%", y = "9%",  rotate = -3 },
     }
+    local titleWidgets = {}
+    for i, img in ipairs(titleImages) do
+        local w = UI.Panel {
+            width = img.size,
+            height = img.size,
+            backgroundImage = img.src,
+            backgroundFit = "contain",
+            position = "absolute",
+            left = img.x,
+            top = img.y,
+            rotate = img.rotate,
+        }
+        table.insert(titleWidgets, w)
+    end
+
+    -- 启动呼吸浮动动画(每个图片独立循环, 利用不同duration实现错开效果)
+    for i, w in ipairs(titleWidgets) do
+        local baseDuration = 2.2 + i * 0.15  -- 每个略微不同周期，产生自然错开
+        local amplitude = 10 + i * 2  -- 浮动幅度微差
+        w:Animate({
+            keyframes = {
+                [0]   = { translateY = 0, scale = 1.0 },
+                [0.5] = { translateY = -amplitude, scale = 1.04 },
+                [1]   = { translateY = 0, scale = 1.0 },
+            },
+            duration = baseDuration,
+            easing = "easeInOut",
+            loop = true,
+            direction = "normal",
+        })
+    end
+
+    -- 构建children(菜单卡片内不再放标题)
+    local children = {}
 
     for _, btn in ipairs(buttons) do
         table.insert(children, btn)
@@ -93,6 +115,27 @@ function MenuScene.Build(callbacks)
         }
     })
 
+    -- 根面板: 标题图片(absolute)漂浮在屏幕上方, 菜单卡片偏下
+    local rootChildren = {
+        UI.Panel {
+            width = 320,
+            backgroundColor = Colors.menuCard,
+            borderRadius = 16,
+            borderWidth = 1,
+            borderColor = Colors.menuBorder,
+            padding = 36,
+            gap = 20,
+            alignItems = "center",
+            marginTop = "auto",
+            marginBottom = "5%",
+            children = children,
+        },
+    }
+    -- 把标题图片作为 absolute 元素加入根面板
+    for _, w in ipairs(titleWidgets) do
+        table.insert(rootChildren, w)
+    end
+
     return UI.Panel {
         id = "root",
         width = "100%",
@@ -100,19 +143,7 @@ function MenuScene.Build(callbacks)
         backgroundColor = Colors.menuBg,
         justifyContent = "center",
         alignItems = "center",
-        children = {
-            UI.Panel {
-                width = 320,
-                backgroundColor = Colors.menuCard,
-                borderRadius = 16,
-                borderWidth = 1,
-                borderColor = Colors.menuBorder,
-                padding = 36,
-                gap = 20,
-                alignItems = "center",
-                children = children,
-            },
-        }
+        children = rootChildren,
     }
 end
 

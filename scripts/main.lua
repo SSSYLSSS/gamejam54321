@@ -113,12 +113,25 @@ local function ShowMenu()
         end,
     })
     UI.SetRoot(root)
+
+    -- 注册标题图片辉光 (五四三 21)
+    local sw = graphics:GetWidth() / graphics:GetDPR()
+    local sh = graphics:GetHeight() / graphics:GetDPR()
+    local smallSize = 300
+    local bigSize = 500
+    VFXManager.SetBloomImages({
+        { src = "pic/五.png", x = sw * 0.14, y = sh * 0.0, w = smallSize, h = smallSize, rotate = -12, intensity = 1.6 },
+        { src = "pic/四.png", x = sw * 0.42, y = sh * 0.0, w = smallSize, h = smallSize, rotate = 0, intensity = 1.6 },
+        { src = "pic/三.png", x = sw * 0.70, y = sh * 0.0, w = smallSize, h = smallSize, rotate = 10, intensity = 1.6 },
+        { src = "pic/21.png", x = sw * 0.38, y = sh * 0.09, w = bigSize, h = bigSize, rotate = -3, intensity = 1.8 },
+    })
 end
 
 --- 切换到难度选择
 function ShowDifficultySelect()
     currentScene = "difficulty"
     VFXManager.ClearParticles()
+    VFXManager.ClearBloomImages()
 
     local root = MenuScene.BuildDifficultySelect({
         onSelect = function(difficulty)
@@ -137,6 +150,7 @@ end
 function ShowGame(fromSave)
     currentScene = "game"
     VFXManager.ClearParticles()
+    VFXManager.ClearBloomImages()
     BGMManager.Play("game")
 
     if fromSave then

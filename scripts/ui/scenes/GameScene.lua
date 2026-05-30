@@ -181,16 +181,16 @@ function GameScene.Update(dt)
             GameScene._UpdateSettlementOverlay()
         end
     else
-        -- 全部翻完后显示"继续"按钮，等待玩家手动点击
-        if not anim.showedContinue then
-            anim.showedContinue = true
-            GameScene._ShowSettlementContinueBtn()
-        end
-        -- 延迟播放胜负音效
+        -- 全部翻完后延迟2秒，同时显示结算弹窗和播放胜负音效
         if anim.winLoseTimer and anim.winLoseTimer > 0 then
             anim.winLoseTimer = anim.winLoseTimer - dt
             if anim.winLoseTimer <= 0 then
                 anim.winLoseTimer = 0
+                -- 同时触发: 弹窗 + 音效
+                if not anim.showedContinue then
+                    anim.showedContinue = true
+                    GameScene._ShowSettlementContinueBtn()
+                end
                 if anim.result.winner == "player" then
                     SFXManager.Play("win")
                 elseif anim.result.winner == "ai" then
@@ -479,7 +479,7 @@ function GameScene._CreatePlayerArea()
             UI.Label {
                 id = "playerPointsLabel",
                 text = "",
-                fontSize = 13,
+                fontSize = 26,
                 fontColor = Colors.success,
             },
             UI.Panel {
@@ -629,10 +629,15 @@ function GameScene._RefreshAIHand()
     aiHandWidgets = {}
     panel:ClearChildren()
 
+    -- 结算动画期间由 _UpdateAIHandInPlace 接管，不在这里全部翻开
+    if settlementAnim then
+        GameScene._UpdateAIHandInPlace()
+        return
+    end
+
     local hand = GameController.GetAIHand()
     local phase = GameController.GetPhase()
-    local showCards = (phase == Constant.PHASE.SETTLEMENT or
-                      phase == Constant.PHASE.POST_DISCARD or
+    local showCards = (phase == Constant.PHASE.POST_DISCARD or
                       phase == Constant.PHASE.POST_KEEP or
                       phase == Constant.PHASE.ROUND_END)
 
@@ -1489,41 +1494,123 @@ function GameScene._CreateSettlementOverlay()
     local anim = settlementAnim
     if not anim then return end
 
-    local overlay = UI.Panel {
-        id = "settlementOverlay",
-        width = "100%",
-        height = "100%",
-        position = "absolute",
-        backgroundColor = { 0, 0, 0, 200 },
-        justifyContent = "center",
-        alignItems = "center",
-        children = {
-            UI.Panel {
-                id = "settlementContent",
-                width = "90%",
-                maxHeight = "80%",
-                backgroundColor = Colors.menuCard,
-                borderRadius = 12,
-                borderWidth = 1,
-                borderColor = Colors.gold,
-                padding = 20,
-                gap = 14,
-                alignItems = "center",
-                children = GameScene._BuildSettlementContent(),
-            }
-        }
-    }
-    uiRoot:AddChild(overlay)
+    -- 翻牌时不创建遮挡窗口，只在屏幕中央显示倒计时图片
+    -- AI手牌直接在游戏界面的aiHandPanel中逐张翻开
+    GameScene._UpdateAIHandInPlace()
+    GameScene._UpdateCountdownOverlay()
 end
 
---- 更新结算弹窗内容(每翻一张牌时重建)
+--- 检测翻开的AI牌是否影响玩家手牌, 触发光线特效
+---@param revealedIdx number 刚翻开的AI牌索引
+function GameScene._TriggerSkillBeamVFX(revealedIdx)
+    local anim = settlementAnim
+    if not anim then return end
+    local aiCard = anim.aiHand[revealedIdx]
+    if not aiCard then return end
+
+    local playerHand = anim.displayPlayerHand or anim.playerHand
+    local aiCount = #anim.aiHand
+    local playerCount = #playerHand
+
+    -- 判断哪些玩家牌受影响
+    local affectedIndices = {}
+    local beamColor = { r = 0.6, g = 0.4, b = 1.0 }  -- 默认紫色
+
+    if aiCard.rank == 11 then
+        -- J: 影响玩家所有普通牌(2-6)
+        beamColor = { r = 0.6, g = 0.3, b = 1.0 }
+        for i, card in ipairs(playerHand) do
+            if Card.IsNormal(card) then
+                table.insert(affectedIndices, i)
+            end
+        end
+    elseif aiCard.rank == 12 then
+        -- Q: 影响玩家点数最大的普通牌
+        beamColor = { r = 0.8, g = 0.2, b = 0.9 }
+        local maxIdx, maxPts = nil, -1
+        for i, card in ipairs(playerHand) do
+            if Card.IsNormal(card) then
+                local pts = Card.GetBasePoints(card)
+                if pts > maxPts then
+                    maxPts = pts
+                    maxIdx = i
+                end
+            end
+        end
+        if maxIdx then
+            table.insert(affectedIndices, maxIdx)
+        end
+    elseif aiCard.rank == 1 then
+        -- A: 影响玩家同花色的牌
+        beamColor = { r = 1.0, g = 0.4, b = 0.3 }
+        for i, card in ipairs(playerHand) do
+            if card.suit and card.suit == aiCard.suit then
+                table.insert(affectedIndices, i)
+            end
+        end
+    elseif aiCard.rank == 8 then
+        -- 8: 影响玩家所有普通牌(2-6)
+        beamColor = { r = 1.0, g = 0.7, b = 0.2 }
+        for i, card in ipairs(playerHand) do
+            if Card.IsNormal(card) then
+                table.insert(affectedIndices, i)
+            end
+        end
+    end
+
+    if #affectedIndices == 0 then return end
+
+    -- 计算屏幕坐标 (基于布局估算)
+    local sw = graphics:GetWidth() / graphics:GetDPR()
+    local sh = graphics:GetHeight() / graphics:GetDPR()
+
+    -- AI 牌位置估算: topBar(50) + aiArea上部约30 + 牌中心
+    -- AI 牌大小 120×168, gap=12, 居中排列
+    local aiCardW = 120
+    local aiCardH = 168
+    local aiTotalW = aiCount * aiCardW + (aiCount - 1) * 12
+    -- 左侧deckPile=90, 右侧discardPile=90, padding=16
+    local centerAreaLeft = 90
+    local centerAreaW = sw - 180  -- 减去左右两侧
+    local aiStartX = centerAreaLeft + (centerAreaW - aiTotalW) * 0.5
+    local aiY = 50 + 6 + 13 + 6 + aiCardH * 0.5  -- topBar + gap + label + gap + 半高
+
+    local srcX = aiStartX + (revealedIdx - 1) * (aiCardW + 12) + aiCardW * 0.5
+    local srcY = aiY
+
+    -- 玩家牌位置估算: 从底部算起 bottomBar(60) + gap + label(13) + gap + 牌中心
+    local playerCardW = 216
+    local playerCardH = 300
+    local playerTotalW = playerCount * playerCardW + (playerCount - 1) * 12
+    local playerStartX = centerAreaLeft + (centerAreaW - playerTotalW) * 0.5
+    -- 从底部: bottomBar(60) + playerArea (alignItems=center, gap=6): label(13) + gap + 手牌 + gap + pointsLabel(26)
+    local playerY = sh - 60 - 6 - 13 - 6 - playerCardH * 0.5
+
+    for _, pIdx in ipairs(affectedIndices) do
+        local destX = playerStartX + (pIdx - 1) * (playerCardW + 12) + playerCardW * 0.5
+        local destY = playerY
+        VFXManager.EmitLightBeam(srcX, srcY, destX, destY, {
+            r = beamColor.r, g = beamColor.g, b = beamColor.b,
+            duration = 1.0,
+        })
+    end
+end
+
+--- 更新结算内容(每翻一张牌时调用)
 function GameScene._UpdateSettlementOverlay()
-    local overlay = uiRoot:FindById("settlementOverlay")
-    if overlay then overlay:Remove() end
-    GameScene._CreateSettlementOverlay()
+    -- 在游戏界面直接翻开AI手牌
+    GameScene._UpdateAIHandInPlace()
+
+    -- 翻牌时触发技能影响光线特效
+    local anim = settlementAnim
+    if anim and anim.revealedCount > 0 then
+        GameScene._TriggerSkillBeamVFX(anim.revealedCount)
+    end
+
+    -- 更新倒计时图片
+    GameScene._UpdateCountdownOverlay()
 
     -- 全部翻完后触发结算效果
-    local anim = settlementAnim
     if anim and anim.revealedCount >= #anim.aiHand and not anim.vfxTriggered then
         anim.vfxTriggered = true
         local sw = graphics:GetWidth() / graphics:GetDPR()
@@ -1534,16 +1621,107 @@ function GameScene._UpdateSettlementOverlay()
         elseif anim.result.winner == "ai" then
             VFXManager.EmitLoseParticles(cx, cy)
         end
-        -- 延迟1秒播放胜负音效(避免和翻牌音效撞上)
-        anim.winLoseTimer = 1.0
+        -- 延迟2秒后同时显示结算弹窗和播放胜负音效
+        anim.winLoseTimer = 2.0
     end
 end
 
---- 生成效果描述列表(展示每张牌触发了什么效果)
----@param hand table[] 手牌
+--- 在游戏界面直接翻开AI手牌(不创建弹窗)
+function GameScene._UpdateAIHandInPlace()
+    local anim = settlementAnim
+    if not anim then return end
+    local panel = uiRoot:FindById("aiHandPanel")
+    if not panel then return end
+
+    -- 清理旧组件
+    for _, w in ipairs(aiHandWidgets) do
+        if w and w.Remove then w:Remove() end
+    end
+    aiHandWidgets = {}
+    panel:ClearChildren()
+
+    -- 逐张显示：已翻的显示正面，未翻的显示背面
+    for i, card in ipairs(anim.aiHand) do
+        local widget
+        if i <= anim.revealedCount then
+            widget = CardWidget.Create(card, { isAI = true })
+        else
+            widget = CardWidget.Create(nil, { isAI = true })
+        end
+        panel:AddChild(widget)
+        table.insert(aiHandWidgets, widget)
+    end
+end
+
+--- 更新屏幕中央倒计时图片
+function GameScene._UpdateCountdownOverlay()
+    local anim = settlementAnim
+    if not anim then return end
+
+    local remaining = #anim.aiHand - anim.revealedCount + 1
+
+    -- 倒计时图片映射(5→1)
+    local countdownImages = {
+        [5] = "pic/五.png",
+        [4] = "pic/四.png",
+        [3] = "pic/三.png",
+        [2] = "pic/二.png",
+        [1] = "pic/一.png",
+    }
+
+    -- remaining 在 1-5 范围内时显示(包括最后一张翻开时显示"一")
+    if remaining >= 1 and remaining <= 5 then
+        local imgSrc = countdownImages[remaining]
+        local imgSize = 320
+        -- 复用已有 overlay，只更新图片(无动画，即时切换)
+        local existingOverlay = uiRoot:FindById("countdownOverlay")
+        if existingOverlay then
+            local imgPanel = existingOverlay:FindById("countdownImg")
+            if imgPanel then
+                imgPanel:SetStyle({ backgroundImage = imgSrc, opacity = 1.0 })
+            end
+        else
+            local overlay = UI.Panel {
+                id = "countdownOverlay",
+                width = "100%",
+                height = "100%",
+                position = "absolute",
+                justifyContent = "center",
+                alignItems = "center",
+                opacity = 1.0,
+                children = {
+                    UI.Panel {
+                        id = "countdownImg",
+                        width = imgSize,
+                        height = imgSize,
+                        backgroundImage = imgSrc,
+                        backgroundFit = "contain",
+                        opacity = 1.0,
+                    },
+                }
+            }
+            uiRoot:AddChild(overlay)
+        end
+        -- 注册倒计时图片辉光 (居中显示)
+        local sw = graphics:GetWidth() / graphics:GetDPR()
+        local sh = graphics:GetHeight() / graphics:GetDPR()
+        local cx = (sw - imgSize) * 0.5
+        local cy = (sh - imgSize) * 0.5
+        VFXManager.SetBloomImages({
+            { src = imgSrc, x = cx, y = cy, w = imgSize, h = imgSize, rotate = 0, intensity = 1.8 },
+        })
+    else
+        -- 超出范围则移除
+        local oldOverlay = uiRoot:FindById("countdownOverlay")
+        if oldOverlay then oldOverlay:Remove() end
+        VFXManager.ClearBloomImages()
+    end
+end
+
+--- 构建效果详情标签列表
+---@param hand table
 ---@param details table|nil 计算详情
----@param isPlayer boolean 是否是玩家
----@return table[] UI children
+---@param isPlayer boolean
 local function buildEffectDetails(hand, details, isPlayer)
     if not details then return {} end
 
@@ -1582,7 +1760,7 @@ local function buildEffectDetails(hand, details, isPlayer)
         })
     end
 
-    -- 8 效果(己方8降己方普通牌, 对方8提升己方普通牌)
+    -- 8 效果
     if (details.eightEffects and details.eightEffects > 0) or (details.opponentEightCount and details.opponentEightCount > 0) then
         local parts = {}
         if details.eightEffects and details.eightEffects > 0 then
@@ -1607,7 +1785,7 @@ local function buildEffectDetails(hand, details, isPlayer)
         })
     end
 
-    -- J 翻倍效果(被对方J翻倍)
+    -- J 翻倍效果
     if details.opponentJackCount and details.opponentJackCount > 0 then
         table.insert(effects, UI.Label {
             text = string.format("被对方J效果(%d张): 普通牌点数×%d", details.opponentJackCount, 2 ^ details.opponentJackCount),
@@ -1655,248 +1833,137 @@ local function buildEffectDetails(hand, details, isPlayer)
     return effects
 end
 
---- 构建结算弹窗的内容children
----@return table[]
-function GameScene._BuildSettlementContent()
-    local anim = settlementAnim
-    if not anim then return {} end
-
-    local revealed = anim.revealedCount
-    local allRevealed = revealed >= #anim.aiHand
-
-    -- 计算当前已翻开牌的累计点数
-    -- 玩家: 翻牌期间显示裸分(不含对方效果), 翻完后显示最终分
-    local playerPts
-    if allRevealed then
-        playerPts = anim.result.playerPoints
-    else
-        playerPts = anim.playerRawPoints or anim.result.playerPoints
-    end
-
-    local aiPtsShown = 0
-    if allRevealed then
-        aiPtsShown = anim.result.aiPoints
-    else
-        for i = 1, revealed do
-            local card = anim.aiHand[i]
-            if card then
-                aiPtsShown = aiPtsShown + Card.GetBasePoints(card)
-            end
-        end
-    end
-
-    -- AI 手牌显示行 (翻开的显示正面,未翻的显示背面)
-    local aiCardWidgets = {}
-    for i, card in ipairs(anim.aiHand) do
-        if i <= revealed then
-            table.insert(aiCardWidgets, CardWidget.Create(card, { small = true }))
-        else
-            table.insert(aiCardWidgets, CardWidget.Create(nil, { small = true }))
-        end
-    end
-
-    -- 玩家手牌显示行(始终显示displayPlayerHand,被移除的牌标记半透明)
-    local showHand = anim.displayPlayerHand or anim.playerHand
-    local playerCardWidgets = {}
-    -- 找出被移除牌在displayPlayerHand中的位置(最后多出来的那张)
-    local removedIdx = nil
-    if anim.aiSmallJokerRemoved and #showHand > #anim.playerHand then
-        removedIdx = #showHand
-    end
-    for i, card in ipairs(showHand) do
-        local isRemovedCard = (i == removedIdx)
-        if isRemovedCard and anim.jokerRevealTriggered then
-            -- AI小王已翻开: 显示半透明+删除线标记
-            local cardWidget = CardWidget.Create(card, { small = true, skipTooltip = true })
-            local wrapper = UI.Panel {
-                opacity = 0.35,
-                children = { cardWidget },
-            }
-            table.insert(playerCardWidgets, wrapper)
-        else
-            table.insert(playerCardWidgets, CardWidget.Create(card, { small = true }))
-        end
-    end
-
-    -- 点数显示
-    local aiPtsText = allRevealed and string.format("%d 点", aiPtsShown) or string.format("%d 点...", aiPtsShown)
-    local playerPtsText
-    if allRevealed and anim.playerRawPoints and anim.playerRawPoints ~= anim.result.playerPoints then
-        playerPtsText = string.format("%d → %d 点", anim.playerRawPoints, anim.result.playerPoints)
-    else
-        playerPtsText = string.format("%d 点", playerPts)
-    end
-
-    -- 距离21的描述
-    local aiDistText = ""
-    local playerDistText = ""
-    if allRevealed and not anim.result.sevenRuleTriggered then
-        local aiDist = math.abs(GameConfig.TARGET_POINTS - aiPtsShown)
-        local playerDist = math.abs(GameConfig.TARGET_POINTS - playerPts)
-        aiDistText = string.format("(距21: %d)", aiDist)
-        playerDistText = string.format("(距21: %d)", playerDist)
-    end
-
-    -- 效果详情(全部翻开后显示)
-    local aiEffectWidgets = {}
-    local playerEffectWidgets = {}
-    if allRevealed and not anim.result.sevenRuleTriggered then
-        aiEffectWidgets = buildEffectDetails(anim.aiHand, anim.result.aiDetails, false)
-        playerEffectWidgets = buildEffectDetails(anim.playerHand, anim.result.playerDetails, true)
-    end
-
-    -- 结果文字(全部翻开后显示)
-    local resultChildren = {}
-    if allRevealed then
-        -- 三7特殊规则提示
-        if anim.result.sevenRuleTriggered then
-            table.insert(resultChildren, UI.Label {
-                text = "三7特殊规则触发!",
-                fontSize = 14,
-                fontColor = { 255, 200, 50, 255 },
-            })
-        end
-        local resultText = ""
-        local resultColor = Colors.textDim
-        if anim.result.winner == "player" then
-            resultText = "你赢了!"
-            resultColor = Colors.success
-        elseif anim.result.winner == "ai" then
-            resultText = "AI赢了!"
-            resultColor = { 255, 100, 100, 255 }
-        else
-            resultText = "平局!"
-            resultColor = Colors.gold
-        end
-        table.insert(resultChildren, UI.Label {
-            text = resultText,
-            fontSize = 20,
-            fontColor = resultColor,
-        })
-        table.insert(resultChildren, UI.Button {
-            text = "继续",
-            variant = "primary",
-            onPointerEnter = function() SFXManager.Play("buttonFocus") end,
-            onClick = function()
-                GameScene._CloseSettlementAndAdvance()
-            end,
-        })
-    else
-        table.insert(resultChildren, UI.Label {
-            text = string.format("翻牌中... (%d/%d)", revealed, #anim.aiHand),
-            fontSize = 12,
-            fontColor = Colors.textDim,
-        })
-    end
-
-    -- 构建AI区域children
-    local aiAreaChildren = {
-        UI.Panel {
-            flexDirection = "row", gap = 4, alignItems = "center",
-            children = {
-                UI.Label { text = "AI:", fontSize = 13, fontColor = Colors.textDim },
-                UI.Label { text = aiPtsText, fontSize = 15, fontColor = { 255, 180, 80, 255 } },
-                UI.Label { text = aiDistText, fontSize = 11, fontColor = Colors.textDim },
-            }
-        },
-        UI.Panel {
-            flexDirection = "row", gap = 6, flexWrap = "wrap", justifyContent = "center",
-            children = aiCardWidgets,
-        },
-    }
-    -- 追加AI效果详情
-    for _, w in ipairs(aiEffectWidgets) do
-        table.insert(aiAreaChildren, w)
-    end
-
-    -- 构建玩家区域children
-    local playerAreaChildren = {
-        UI.Panel {
-            flexDirection = "row", gap = 4, alignItems = "center",
-            children = {
-                UI.Label { text = "你:", fontSize = 13, fontColor = Colors.textDim },
-                UI.Label { text = playerPtsText, fontSize = 15, fontColor = Colors.success },
-                UI.Label { text = playerDistText, fontSize = 11, fontColor = Colors.textDim },
-            }
-        },
-        UI.Panel {
-            flexDirection = "row", gap = 6, flexWrap = "wrap", justifyContent = "center",
-            children = playerCardWidgets,
-        },
-    }
-    -- AI小王效果提示(翻到小王后持续显示)
-    if anim.jokerRevealTriggered and anim.aiSmallJokerRemoved then
-        table.insert(playerAreaChildren, UI.Label {
-            text = "对方小王效果: 移除了 " .. Card.GetName(anim.aiSmallJokerRemoved),
-            fontSize = 12,
-            fontColor = { 255, 120, 120, 255 },
-        })
-    end
-    -- 追加玩家效果详情
-    for _, w in ipairs(playerEffectWidgets) do
-        table.insert(playerAreaChildren, w)
-    end
-
-    return {
-        UI.Label { text = "结算", fontSize = 18, fontColor = Colors.gold },
-        -- AI 区域
-        UI.Panel {
-            width = "100%", gap = 6, alignItems = "center",
-            children = aiAreaChildren,
-        },
-        -- 分隔
-        UI.Panel { width = "80%", height = 1, backgroundColor = Colors.menuBorder },
-        -- 玩家区域
-        UI.Panel {
-            width = "100%", gap = 6, alignItems = "center",
-            children = playerAreaChildren,
-        },
-        -- 分隔
-        UI.Panel { width = "80%", height = 1, backgroundColor = Colors.menuBorder },
-        -- 结果
-        UI.Panel {
-            width = "100%", alignItems = "center", gap = 8,
-            children = resultChildren,
-        },
-    }
-end
-
---- 在结算弹窗底部显示"继续"按钮
+--- 全部翻完后显示结果覆盖层(胜负+点数计算+继续按钮)
 function GameScene._ShowSettlementContinueBtn()
     if not uiRoot then return end
-    local overlay = uiRoot:FindById("settlementOverlay")
-    if not overlay then return end
-    local content = overlay:FindById("settlementContent")
-    if not content then return end
+    local anim = settlementAnim
+    if not anim then return end
 
-    content:AddChild(UI.Panel {
-        width = "100%",
-        height = 1,
-        backgroundColor = Colors.menuBorder,
-        marginTop = 4,
+    -- 移除倒计时
+    local cdOverlay = uiRoot:FindById("countdownOverlay")
+    if cdOverlay then cdOverlay:Remove() end
+    VFXManager.ClearBloomImages()
+
+    -- 构建结果文字
+    local resultText = ""
+    local resultColor = Colors.textDim
+    if anim.result.winner == "player" then
+        resultText = "你赢了!"
+        resultColor = Colors.success
+    elseif anim.result.winner == "ai" then
+        resultText = "AI赢了!"
+        resultColor = { 255, 100, 100, 255 }
+    else
+        resultText = "平局!"
+        resultColor = Colors.gold
+    end
+
+    -- 点数信息
+    local ptsInfo = string.format("你: %d点  AI: %d点",
+        anim.result.playerPoints or 0, anim.result.aiPoints or 0)
+
+    -- 距离21
+    local distInfo = ""
+    if not anim.result.sevenRuleTriggered then
+        local playerDist = math.abs(GameConfig.TARGET_POINTS - (anim.result.playerPoints or 0))
+        local aiDist = math.abs(GameConfig.TARGET_POINTS - (anim.result.aiPoints or 0))
+        distInfo = string.format("距21: 你%d  AI%d", playerDist, aiDist)
+    end
+
+    -- 效果详情
+    local detailChildren = {}
+    if not anim.result.sevenRuleTriggered then
+        local playerEffects = buildEffectDetails(anim.playerHand, anim.result.playerDetails, true)
+        local aiEffects = buildEffectDetails(anim.aiHand, anim.result.aiDetails, false)
+        if #playerEffects > 0 then
+            table.insert(detailChildren, UI.Label { text = "-- 你的效果 --", fontSize = 11, fontColor = Colors.textDim })
+            for _, w in ipairs(playerEffects) do
+                table.insert(detailChildren, w)
+            end
+        end
+        if #aiEffects > 0 then
+            table.insert(detailChildren, UI.Label { text = "-- AI的效果 --", fontSize = 11, fontColor = Colors.textDim })
+            for _, w in ipairs(aiEffects) do
+                table.insert(detailChildren, w)
+            end
+        end
+    else
+        table.insert(detailChildren, UI.Label {
+            text = "三7特殊规则触发!",
+            fontSize = 13,
+            fontColor = { 255, 200, 50, 255 },
+        })
+    end
+
+    -- 构建内容children
+    local contentChildren = {
+        UI.Label { text = resultText, fontSize = 22, fontColor = resultColor },
+        UI.Label { text = ptsInfo, fontSize = 14, fontColor = Colors.textDim },
+    }
+    if distInfo ~= "" then
+        table.insert(contentChildren, UI.Label { text = distInfo, fontSize = 12, fontColor = Colors.textDim })
+    end
+    -- 效果详情区域
+    if #detailChildren > 0 then
+        table.insert(contentChildren, UI.Panel {
+            width = "100%", height = 1, backgroundColor = Colors.menuBorder, marginVertical = 4,
+        })
+        for _, w in ipairs(detailChildren) do
+            table.insert(contentChildren, w)
+        end
+    end
+    -- 继续按钮
+    table.insert(contentChildren, UI.Panel {
+        width = "100%", height = 1, backgroundColor = Colors.menuBorder, marginVertical = 4,
     })
-    content:AddChild(UI.Button {
+    table.insert(contentChildren, UI.Button {
         text = "继续",
-        width = "80%",
-        height = 38,
+        width = "70%",
+        height = 40,
         fontSize = 15,
-        fontColor = Colors.accent,
-        backgroundColor = { 40, 55, 80, 220 },
-        borderRadius = 8,
-        borderWidth = 1,
-        borderColor = { Colors.accent[1], Colors.accent[2], Colors.accent[3], 120 },
+        variant = "primary",
         onPointerEnter = function() SFXManager.Play("buttonFocus") end,
         onClick = function()
             GameScene._CloseSettlementAndAdvance()
         end,
     })
+
+    -- 创建结果覆盖层
+    local overlay = UI.Panel {
+        id = "settlementOverlay",
+        width = "100%",
+        height = "100%",
+        position = "absolute",
+        backgroundColor = { 0, 0, 0, 160 },
+        justifyContent = "center",
+        alignItems = "center",
+        children = {
+            UI.Panel {
+                id = "settlementContent",
+                width = "85%",
+                maxHeight = "80%",
+                backgroundColor = Colors.menuCard,
+                borderRadius = 12,
+                borderWidth = 1,
+                borderColor = Colors.gold,
+                padding = 20,
+                gap = 8,
+                alignItems = "center",
+                children = contentChildren,
+            }
+        }
+    }
+    uiRoot:AddChild(overlay)
 end
 
---- 关闭结算弹窗
+--- 关闭结算覆盖层
 function GameScene._CloseSettlementOverlay()
     settlementAnim = nil
     local overlay = uiRoot:FindById("settlementOverlay")
     if overlay then overlay:Remove() end
+    local cdOverlay = uiRoot:FindById("countdownOverlay")
+    if cdOverlay then cdOverlay:Remove() end
+    VFXManager.ClearBloomImages()
 end
 
 --- 关闭结算弹窗并自动推进到POST_DISCARD阶段(或直接结束游戏)
