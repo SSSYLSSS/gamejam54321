@@ -208,39 +208,42 @@ local function ProcessPlayerDiscard(playerId, discardIndices)
         playerState:AddToDiscard(card)
     end
 
-    -- J 效果处理
-    playerState.pendingJackPicks = jackCount
+    -- 追踪J弃牌数
     playerState.discardedJackCount = playerState.discardedJackCount + jackCount
-    local jackDrawn = {}
-    while playerState.pendingJackPicks > 0 do
-        local card
-        if playerState:GetDiscardCount() > 0 then
-            card = playerState:DrawRandomFromDiscard()
-        elseif #playerState.deck > 0 then
-            card = DeckSystem.DrawRandom(playerState.deck)
-        end
-        if card then
-            playerState:AddToHand(card)
-            table.insert(jackDrawn, card)
-        end
-        playerState.pendingJackPicks = playerState.pendingJackPicks - 1
-    end
 
-    -- 非J正常补牌
-    local normalDrawCount = #discarded - jackCount
+    -- J效果: 弃置含J → 所有补牌从弃牌堆/抽牌堆智能选择(服务端自动决策)
     local drawn = {}
-    for _ = 1, normalDrawCount do
-        local card = DeckSystem.Draw(playerState.deck, round)
-        if card then
-            playerState:AddToHand(card)
-            table.insert(drawn, card)
+    if jackCount > 0 then
+        playerState.pendingJackPicks = #discarded
+        while playerState.pendingJackPicks > 0 do
+            local card
+            -- 服务端策略: 优先从弃牌堆拿
+            if playerState:GetDiscardCount() > 0 then
+                card = playerState:DrawRandomFromDiscard()
+            elseif #playerState.deck > 0 then
+                card = DeckSystem.Draw(playerState.deck, round)
+            end
+            if card then
+                playerState:AddToHand(card)
+                table.insert(drawn, card)
+            end
+            playerState.pendingJackPicks = playerState.pendingJackPicks - 1
+        end
+    else
+        -- 无J: 正常从抽牌堆补牌
+        playerState.pendingJackPicks = 0
+        for _ = 1, #discarded do
+            local card = DeckSystem.Draw(playerState.deck, round)
+            if card then
+                playerState:AddToHand(card)
+                table.insert(drawn, card)
+            end
         end
     end
 
     return {
         discarded = discarded,
-        jackDrawn = jackDrawn,
-        normalDrawn = drawn,
+        drawn = drawn,
         jackCount = jackCount,
     }
 end
@@ -251,7 +254,7 @@ ResolveTurn = function()
     for i = 1, 2 do
         local action = pendingActions_[i]
         if action.skip then
-            results[i] = { discarded = {}, jackDrawn = {}, normalDrawn = {}, jackCount = 0 }
+            results[i] = { discarded = {}, drawn = {}, jackCount = 0 }
         else
             results[i] = ProcessPlayerDiscard(i, action.indices)
         end

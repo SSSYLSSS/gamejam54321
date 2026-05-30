@@ -17,7 +17,7 @@ function PlayerState.New(isAI)
     self.keepCard = nil         -- 保留到下一局的牌
     self.pendingJackPicks = 0   -- J效果待处理次数
     self.discardedTenCount = 0  -- 本局弃置的10的数量(用于10的+1效果)
-    self.discardedJackCount = 0 -- 本局弃置的J的数量(用于J的结算翻倍效果)
+    self.discardedJackCount = 0 -- 本局弃置的J的数量(用于J的补牌选择效果)
     return self
 end
 

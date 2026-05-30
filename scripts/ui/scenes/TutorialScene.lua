@@ -56,7 +56,7 @@ local PAGES = {
         content = {
             { type = "card", rank = "A", desc = "结算时翻倍对手同花色普通牌" },
             { type = "card", rank = "7", desc = "不可被其他效果改变或删除" },
-            { type = "card", rank = "8", desc = "降低自己所有普通牌各1点" },
+            { type = "card", rank = "8", desc = "降低自己所有普通牌各1点(可叠加)" },
             { type = "card", rank = "9", desc = "灵活牌：可视为 0 或 9 点" },
             { type = "card", rank = "10", desc = "若曾被弃置过，最终得分+1" },
         }
@@ -65,7 +65,7 @@ local PAGES = {
         title = "特殊牌效果(下)",
         icon = "⚡",
         content = {
-            { type = "card", rank = "J", desc = "弃置时从弃牌堆抽1张牌\n结算时翻倍对方普通牌" },
+            { type = "card", rank = "J", desc = "弃置含J时, 所有补牌可逐张\n选择从弃牌堆或抽牌堆抽取" },
             { type = "card", rank = "Q", desc = "使对方最大普通牌点数×2(可叠加)" },
             { type = "card", rank = "K", desc = "对方点数向上取整到十位\n己方-5后向下取整到十位" },
             { type = "gap" },

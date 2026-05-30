@@ -1,7 +1,7 @@
 -- ============================================================================
 -- system/RuleEngine.lua - 规则引擎
 -- 负责点数计算、7规则判定、胜负判定
--- 新规则: 9(0或9) / 10(弃置过+1) / J(翻倍对方普通牌) / Q(对方最小普通牌×3) / K(+1)
+-- 新规则: 9(0或9) / 10(弃置过+1) / J(弃置时选择补牌来源) / Q(对方最大普通牌×2) / K(+1)
 -- ============================================================================
 
 local Card = require("core.Card")
@@ -25,20 +25,14 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
         sevenCount = 0,
         nineFlexSaved = 0,
         tenBonus = 0,
-        jackDoubleEffect = false,
         queenTripled = false,
         kingBonus = 0,
         finalPoints = 0,
     }
 
     -- =======================================================================
-    -- 0. 对方 J 效果: 若对方弃置过 J, 则我方普通牌(2-6)点数翻倍
+    -- 0. J 效果: 仅弃置时选择补牌来源, 无结算效果(已移除翻倍)
     -- =======================================================================
-    local opponentJackDouble = false
-    if opponentState and opponentState.discardedJackCount > 0 then
-        opponentJackDouble = true
-        details.jackDoubleEffect = true
-    end
 
     -- =======================================================================
     -- 1. 对方 Q 效果: 每张Q使我方手牌中点数最大的一张普通牌(2-6)点数×2
@@ -127,10 +121,7 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
             end
         end
 
-        -- J 翻倍效果: 对方弃置过 J, 我方普通牌(2-6)翻倍
-        if opponentJackDouble and Card.IsNormal(card) then
-            points = points * 2
-        end
+        -- (J 翻倍效果已移除, J仅影响弃置时补牌来源选择)
 
         -- Ace 翻倍效果
         if card.suit and aceDoubledSuits[card.suit] then
@@ -155,9 +146,6 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
                 -- 当前 9 贡献了多少点? 重新计算
                 local nineContribution = 9
                 -- 应用可能的翻倍效果
-                if opponentJackDouble then
-                    -- 9 不是 normal(2-6), 不受 J 翻倍
-                end
                 if card.suit and aceDoubledSuits[card.suit] then
                     nineContribution = nineContribution * 2
                 end

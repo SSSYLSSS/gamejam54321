@@ -50,10 +50,10 @@ local function getCardEffectText(card)
     local rank = card.rank
     if rank == 1 then return "A: 结算时翻倍对方同花色牌点数" end
     if rank == 7 then return "7: 不可被改变点数/删除, 3张7触发特殊胜负" end
-    if rank == 8 then return "8: 使自己普通牌(2~6)点数各减1" end
+    if rank == 8 then return "8: 使自己普通牌(2~6)点数各减1(可叠加)" end
     if rank == 9 then return "9: 结算时点数可视为0或9" end
     if rank == 10 then return "10(10点): 若弃置过此牌, 最终点数+1" end
-    if rank == 11 then return "J(11点): 弃置时从弃牌堆抽牌; 结算前翻倍对方普通牌" end
+    if rank == 11 then return "J(11点): 弃置含J时, 所有补牌可逐张选择从弃牌堆或抽牌堆抽取" end
     if rank == 12 then return "Q(12点): 结算时使对方最大普通牌点数×2(可叠加)" end
     if rank == 13 then return "K: 对方点数向上取整到十位, 己方-5后向下取整到十位" end
     if rank >= 2 and rank <= 6 then

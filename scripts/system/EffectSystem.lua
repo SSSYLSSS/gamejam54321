@@ -26,12 +26,21 @@ function EffectSystem.PlayerJackPick(playerState, roundState, source)
         return false, "没有待处理的J效果", nil
     end
 
-    -- 从自己的弃牌堆抽, 弃牌堆空则从自己的抽牌堆
+    -- 根据玩家选择从弃牌堆或抽牌堆抽取
     local card
-    if playerState:GetDiscardCount() > 0 then
-        card = playerState:DrawRandomFromDiscard()
+    if source == "discard" then
+        if playerState:GetDiscardCount() > 0 then
+            card = playerState:DrawRandomFromDiscard()
+        else
+            return false, "弃牌堆为空", nil
+        end
     else
-        card = DeckSystem.DrawRandom(playerState.deck)
+        -- source == "deck" 或默认
+        if #playerState.deck > 0 then
+            card = DeckSystem.Draw(playerState.deck, roundState)
+        else
+            return false, "抽牌堆为空", nil
+        end
     end
 
     if not card then
@@ -43,18 +52,19 @@ function EffectSystem.PlayerJackPick(playerState, roundState, source)
     return true, nil, card
 end
 
---- AI 的 J 效果处理(弃置时自动从自己牌堆抽牌)
+--- AI 的 J 效果处理(弃置含J时所有补牌从弃牌堆/抽牌堆智能选择)
 ---@param aiState table PlayerState
----@param roundState table RoundState (保留参数兼容)
+---@param roundState table RoundState
 ---@return table[] drawnCards 抽到的牌列表
 function EffectSystem.AIJackPick(aiState, roundState)
     local drawn = {}
     while aiState.pendingJackPicks > 0 do
         local card
+        -- AI策略: 优先从弃牌堆拿(已知牌质量可能更好), 否则从抽牌堆
         if aiState:GetDiscardCount() > 0 then
             card = aiState:DrawRandomFromDiscard()
         elseif #aiState.deck > 0 then
-            card = DeckSystem.DrawRandom(aiState.deck)
+            card = DeckSystem.Draw(aiState.deck, roundState)
         end
         if card then
             aiState:AddToHand(card)

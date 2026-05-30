@@ -1572,15 +1572,6 @@ local function buildEffectDetails(hand, details, isPlayer)
         })
     end
 
-    -- J 翻倍效果
-    if details.jackDoubleEffect then
-        table.insert(effects, UI.Label {
-            text = "被对方J弃置效果翻倍(普通牌x2)",
-            fontSize = 11,
-            fontColor = { 200, 100, 255, 255 },
-        })
-    end
-
     -- Q 效果
     if details.queenTripled and details.queenDoubleMap then
         local qCount = details.queenCount or 1
@@ -2087,12 +2078,12 @@ function GameScene._ShowJackPickUI()
                 alignItems = "center",
                 children = {
                     UI.Label {
-                        text = "J 弃置效果",
+                        text = "J 效果: 选择补牌来源",
                         fontSize = 18,
                         fontColor = Colors.jokerPurple,
                     },
                     UI.Label {
-                        text = string.format("从你的牌堆中随机抽取一张牌\n(剩余 %d 次)", remaining),
+                        text = string.format("逐张选择从弃牌堆还是抽牌堆补牌\n(剩余 %d 次)", remaining),
                         fontSize = 13,
                         fontColor = Colors.textDim,
                         textAlign = "center",
