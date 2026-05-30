@@ -12,8 +12,12 @@ local VFXManager = {}
 
 ---@type any NanoVG context
 local vg = nil
+---@type any NanoVG overlay context (渲染在 UI 上层, 用于飘字)
+local vgOverlay = nil
 ---@type number
 local fontId = -1
+---@type number
+local fontIdOverlay = -1
 ---@type table ParticleSystem instance
 local particles = nil
 ---@type table BackgroundRenderer instance
@@ -52,12 +56,22 @@ function VFXManager.Init()
     -- 启用 NanoVG 层 Bloom 后处理
     nvgSetBloomEnabled(vg, true)
 
+    -- 创建 overlay 上下文 (渲染在 UI 上层, 用于飘字)
+    vgOverlay = nvgCreate(1)
+    fontIdOverlay = nvgCreateFont(vgOverlay, "sans", "Fonts/MiSans-Regular.ttf")
+    nvgSetRenderOrder(vgOverlay, 999995)  -- UI=999990, 比UI高
+
     -- 订阅 NanoVG 渲染事件
     SubscribeToEvent(vg, "NanoVGRender", "HandleVFXRender")
+    SubscribeToEvent(vgOverlay, "NanoVGRender", "HandleVFXOverlayRender")
 end
 
 --- 销毁
 function VFXManager.Shutdown()
+    if vgOverlay then
+        nvgDelete(vgOverlay)
+        vgOverlay = nil
+    end
     if vg then
         nvgDelete(vg)
         vg = nil
@@ -125,37 +139,61 @@ end
 -- 粒子效果触发接口
 -- ============================================================================
 
---- 胜利烟花 (金色爆发)
----@param x number
----@param y number
-function VFXManager.EmitWinParticles(x, y)
+--- 胜利烟花 (四角向中央金色粒子)
+---@param cx number 中心X (目标点)
+---@param cy number 中心Y (目标点)
+function VFXManager.EmitWinParticles(cx, cy)
     if not particles then return end
-    particles:Emit(x, y, 50, {
-        r = 1.0, g = 0.85, b = 0.2,
-        speed = 250,
-        life = 2.0,
-        radius = 8,
-    })
-    -- 追加一些白色小粒子
-    particles:Emit(x, y, 30, {
-        r = 1.0, g = 1.0, b = 0.9,
-        speed = 150,
-        life = 1.2,
-        radius = 4,
-    })
+    local sw = graphics:GetWidth() / graphics:GetDPR()
+    local sh = graphics:GetHeight() / graphics:GetDPR()
+    -- 四个角
+    local corners = {
+        { x = 0, y = 0 },
+        { x = sw, y = 0 },
+        { x = 0, y = sh },
+        { x = sw, y = sh },
+    }
+    for _, corner in ipairs(corners) do
+        particles:EmitToward(corner.x, corner.y, cx, cy, 30, {
+            r = 1.0, g = 0.85, b = 0.2,
+            speed = 700,
+            life = 1.8,
+            radius = 7,
+            spread = 0.5,
+        })
+        -- 追加白色小粒子
+        particles:EmitToward(corner.x, corner.y, cx, cy, 18, {
+            r = 1.0, g = 1.0, b = 0.9,
+            speed = 500,
+            life = 1.2,
+            radius = 4,
+            spread = 0.4,
+        })
+    end
 end
 
---- 失败粒子 (暗红碎裂)
----@param x number
----@param y number
-function VFXManager.EmitLoseParticles(x, y)
+--- 失败粒子 (四角向中央暗红)
+---@param cx number 中心X (目标点)
+---@param cy number 中心Y (目标点)
+function VFXManager.EmitLoseParticles(cx, cy)
     if not particles then return end
-    particles:Emit(x, y, 30, {
-        r = 0.8, g = 0.2, b = 0.2,
-        speed = 120,
-        life = 1.0,
-        radius = 5,
-    })
+    local sw = graphics:GetWidth() / graphics:GetDPR()
+    local sh = graphics:GetHeight() / graphics:GetDPR()
+    local corners = {
+        { x = 0, y = 0 },
+        { x = sw, y = 0 },
+        { x = 0, y = sh },
+        { x = sw, y = sh },
+    }
+    for _, corner in ipairs(corners) do
+        particles:EmitToward(corner.x, corner.y, cx, cy, 22, {
+            r = 0.8, g = 0.2, b = 0.2,
+            speed = 500,
+            life = 1.2,
+            radius = 6,
+            spread = 0.5,
+        })
+    end
 end
 
 --- 弃牌飞散效果
@@ -364,21 +402,21 @@ function HandleVFXRender(eventType, eventData)
             -- 圆形光源 (缩小)
             local radius = math.max(bi.w, bi.h) * 0.5 * (0.9 + 0.1 * breath)
 
-            -- 外层柔光
+            -- 外层柔光 (天色 あまいろ #2ca9e1 霓虹感)
             nvgBeginPath(vg)
             nvgCircle(vg, 0, 0, radius * 1.5)
             local outerGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 1.3,
-                nvgRGBAf(1.0, 0.92, 0.7, glowAlpha * 0.35),
-                nvgRGBAf(1.0, 0.85, 0.5, 0))
+                nvgRGBAf(0.173, 0.663, 0.882, glowAlpha * 0.4),
+                nvgRGBAf(0.1, 0.5, 0.8, 0))
             nvgFillPaint(vg, outerGrad)
             nvgFill(vg)
 
-            -- 核心亮点
+            -- 核心亮点 (白青色中心)
             nvgBeginPath(vg)
             nvgCircle(vg, 0, 0, radius * 0.6)
             local coreGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 0.4,
-                nvgRGBAf(1.0, 0.98, 0.9, glowAlpha * 0.8),
-                nvgRGBAf(1.0, 0.9, 0.6, 0))
+                nvgRGBAf(0.7, 0.95, 1.0, glowAlpha * 0.85),
+                nvgRGBAf(0.173, 0.663, 0.882, 0))
             nvgFillPaint(vg, coreGrad)
             nvgFill(vg)
 
@@ -436,39 +474,7 @@ function HandleVFXRender(eventType, eventData)
         end
     end
 
-    -- 层级2.9: 飘字 (技能影响文字提示)
-    if #floatingTexts > 0 then
-        nvgFontFace(vg, "sans")
-        nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
-        for _, ft in ipairs(floatingTexts) do
-            local progress = ft.elapsed / ft.duration
-            -- 随机方向偏移
-            local offsetX = ft.dirX * progress
-            local offsetY = ft.dirY * progress
-            -- 淡入淡出: 前15%快速亮起, 后40%淡出
-            local alpha
-            if progress < 0.15 then
-                alpha = progress / 0.15
-            elseif progress > 0.6 then
-                alpha = 1.0 - (progress - 0.6) / 0.4
-            else
-                alpha = 1.0
-            end
-            alpha = math.max(0, math.min(1, alpha))
-
-            nvgSave(vg)
-            nvgTranslate(vg, ft.x + offsetX, ft.y + offsetY)
-            nvgRotate(vg, ft.tilt * math.pi / 180)
-            nvgFontSize(vg, ft.fontSize * 3)
-            -- 描边/阴影
-            nvgFillColor(vg, nvgRGBAf(0, 0, 0, alpha * 0.6))
-            nvgText(vg, 1.5, 1.5, ft.text)
-            -- 正文
-            nvgFillColor(vg, nvgRGBAf(ft.r, ft.g, ft.b, alpha))
-            nvgText(vg, 0, 0, ft.text)
-            nvgRestore(vg)
-        end
-    end
+    -- 飘字已移至 overlay 上下文 (HandleVFXOverlayRender), 不在此层渲染
 
     -- 层级3: 飞行卡牌 (在UI上方) - NanoVG Bloom 辉光效果
     local cardW, cardH = 90, 126
@@ -527,6 +533,65 @@ function HandleVFXRender(eventType, eventData)
     end
 
     nvgEndFrame(vg)
+end
+
+-- ============================================================================
+-- Overlay NanoVG 渲染回调 (飘字, 渲染在 UI 上层)
+-- ============================================================================
+
+--- Overlay 渲染事件处理 (renderOrder 999995, 在 UI 上层)
+function HandleVFXOverlayRender(eventType, eventData)
+    if not vgOverlay then return end
+    if #floatingTexts == 0 then return end
+
+    local sw = graphics:GetWidth() / graphics:GetDPR()
+    local sh = graphics:GetHeight() / graphics:GetDPR()
+
+    nvgBeginFrame(vgOverlay, sw, sh, graphics:GetDPR())
+
+    nvgFontFace(vgOverlay, "sans")
+    nvgTextAlign(vgOverlay, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+
+    for _, ft in ipairs(floatingTexts) do
+        local progress = ft.elapsed / ft.duration
+        -- 随机方向偏移
+        local offsetX = ft.dirX * progress
+        local offsetY = ft.dirY * progress
+        -- 淡入淡出: 前15%快速亮起, 后40%淡出
+        local alpha
+        if progress < 0.15 then
+            alpha = progress / 0.15
+        elseif progress > 0.6 then
+            alpha = 1.0 - (progress - 0.6) / 0.4
+        else
+            alpha = 1.0
+        end
+        alpha = math.max(0, math.min(1, alpha))
+
+        nvgSave(vgOverlay)
+        nvgTranslate(vgOverlay, ft.x + offsetX, ft.y + offsetY)
+        nvgRotate(vgOverlay, ft.tilt * math.pi / 180)
+        nvgFontSize(vgOverlay, ft.fontSize * 3)
+
+        -- 描边 (多方向偏移绘制黑色轮廓)
+        local strokeW = 2.5
+        nvgFillColor(vgOverlay, nvgRGBAf(0, 0, 0, alpha * 0.9))
+        for ox = -strokeW, strokeW, strokeW do
+            for oy = -strokeW, strokeW, strokeW do
+                if ox ~= 0 or oy ~= 0 then
+                    nvgText(vgOverlay, ox, oy, ft.text)
+                end
+            end
+        end
+
+        -- 正文
+        nvgFillColor(vgOverlay, nvgRGBAf(ft.r, ft.g, ft.b, alpha))
+        nvgText(vgOverlay, 0, 0, ft.text)
+
+        nvgRestore(vgOverlay)
+    end
+
+    nvgEndFrame(vgOverlay)
 end
 
 return VFXManager

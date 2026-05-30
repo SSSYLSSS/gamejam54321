@@ -113,18 +113,7 @@ local function ShowMenu()
         end,
     })
     UI.SetRoot(root)
-
-    -- 注册标题图片辉光 (五四三 21)
-    local sw = graphics:GetWidth() / graphics:GetDPR()
-    local sh = graphics:GetHeight() / graphics:GetDPR()
-    local smallSize = 300
-    local bigSize = 500
-    VFXManager.SetBloomImages({
-        { src = "pic/五.png", x = sw * 0.14, y = sh * 0.0, w = smallSize, h = smallSize, rotate = -12, intensity = 1.6 },
-        { src = "pic/四.png", x = sw * 0.42, y = sh * 0.0, w = smallSize, h = smallSize, rotate = 0, intensity = 1.6 },
-        { src = "pic/三.png", x = sw * 0.70, y = sh * 0.0, w = smallSize, h = smallSize, rotate = 10, intensity = 1.6 },
-        { src = "pic/21.png", x = sw * 0.38, y = sh * 0.09, w = bigSize, h = bigSize, rotate = -3, intensity = 1.8 },
-    })
+    -- bloom 位置由 HandleUpdate 每帧跟随标题图片动态更新
 end
 
 --- 切换到难度选择
@@ -204,6 +193,7 @@ end
 --- 切换到多人游戏
 function ShowMultiplayer()
     currentScene = "multiplayer"
+    VFXManager.ClearBloomImages()
 
     -- 检查是否有可用的服务器连接 (background_match 模式)
     local hasConnection = false
@@ -251,6 +241,7 @@ end
 function ShowReplay()
     currentScene = "replay"
     VFXManager.ClearParticles()
+    VFXManager.ClearBloomImages()
     local root = ReplayScene.BuildList(function()
         ShowMenu()
     end)
@@ -261,6 +252,7 @@ end
 function ShowStats()
     currentScene = "stats"
     VFXManager.ClearParticles()
+    VFXManager.ClearBloomImages()
     local root = MenuScene.BuildStats(function()
         ShowMenu()
     end)
@@ -271,6 +263,7 @@ end
 function ShowTutorial()
     currentScene = "tutorial"
     VFXManager.ClearParticles()
+    VFXManager.ClearBloomImages()
     local root = TutorialScene.Build(function()
         ShowMenu()
     end)
@@ -280,6 +273,7 @@ end
 --- 切换到设置
 function ShowSettings()
     currentScene = "settings"
+    VFXManager.ClearBloomImages()
     local root = SettingsScene.Build(audioSettings, {
         onAudioChange = function()
             audio:SetMasterGain(SOUND_MASTER, audioSettings.master / 100)
@@ -298,6 +292,12 @@ end
 -- ============================================================================
 
 function Start()
+    -- 0. 像素渲染: 全局 patch nvgCreateImage, 所有图片使用最近邻过滤
+    local _origNvgCreateImage = nvgCreateImage
+    nvgCreateImage = function(ctx, imgPath, flags)
+        return _origNvgCreateImage(ctx, imgPath, (flags or 0) | NVG_IMAGE_NEAREST)
+    end
+
     -- 1. 初始化 3D 场景 (用于后处理效果)
     Setup3DScene()
 
@@ -351,6 +351,23 @@ function HandleUpdate(eventType, eventData)
     CardWidget.UpdateBreathing(dt)
     if currentScene == "game" then
         GameScene.Update(dt)
+    elseif currentScene == "menu" then
+        -- 每帧更新标题图片 bloom 位置 (跟随浮动动画)
+        if MenuScene.titleWidgets and #MenuScene.titleWidgets > 0 then
+            local bloomList = {}
+            for i, w in ipairs(MenuScene.titleWidgets) do
+                local cfg = MenuScene.titleConfigs[i]
+                local ax, ay = w:GetAbsolutePosition()
+                table.insert(bloomList, {
+                    src = cfg.src,
+                    x = ax, y = ay,
+                    w = cfg.size, h = cfg.size,
+                    rotate = cfg.rotate or 0,
+                    intensity = (cfg.size > 400) and 1.8 or 1.6,
+                })
+            end
+            VFXManager.SetBloomImages(bloomList)
+        end
     end
 end
 

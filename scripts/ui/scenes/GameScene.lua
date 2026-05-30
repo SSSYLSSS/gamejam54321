@@ -1714,32 +1714,36 @@ function GameScene._UpdateAIHandInPlace()
     end
 end
 
---- 更新屏幕中央倒计时图片
+--- 更新屏幕中央倒计时文字
 function GameScene._UpdateCountdownOverlay()
     local anim = settlementAnim
     if not anim then return end
 
     local remaining = #anim.aiHand - anim.revealedCount + 1
 
-    -- 倒计时图片映射(5→1)
-    local countdownImages = {
-        [5] = "pic/五.png",
-        [4] = "pic/四.png",
-        [3] = "pic/三.png",
-        [2] = "pic/二.png",
-        [1] = "pic/一.png",
+    -- 倒计时文字映射(5→1)
+    local countdownTexts = {
+        [5] = "五!",
+        [4] = "四!",
+        [3] = "三!",
+        [2] = "二!",
+        [1] = "一!",
     }
 
-    -- remaining 在 1-5 范围内时显示(包括最后一张翻开时显示"一")
+    -- remaining 在 1-5 范围内时显示
     if remaining >= 1 and remaining <= 5 then
-        local imgSrc = countdownImages[remaining]
-        local imgSize = 320
-        -- 复用已有 overlay，只更新图片(无动画，即时切换)
+        local txt = countdownTexts[remaining]
+
+        -- 隐藏中间提示区域(避免与倒计时文字重叠)
+        local middleArea = uiRoot:FindById("middleArea")
+        if middleArea then middleArea:SetStyle({ opacity = 0 }) end
+
+        -- 复用已有 overlay，只更新文字
         local existingOverlay = uiRoot:FindById("countdownOverlay")
         if existingOverlay then
-            local imgPanel = existingOverlay:FindById("countdownImg")
-            if imgPanel then
-                imgPanel:SetStyle({ backgroundImage = imgSrc, opacity = 1.0 })
+            local label = existingOverlay:FindById("countdownLabel")
+            if label then
+                label:SetText(txt)
             end
         else
             local overlay = UI.Panel {
@@ -1751,31 +1755,27 @@ function GameScene._UpdateCountdownOverlay()
                 alignItems = "center",
                 opacity = 1.0,
                 children = {
-                    UI.Panel {
-                        id = "countdownImg",
-                        width = imgSize,
-                        height = imgSize,
-                        backgroundImage = imgSrc,
-                        backgroundFit = "contain",
-                        opacity = 1.0,
+                    UI.Label {
+                        id = "countdownLabel",
+                        text = txt,
+                        fontSize = 200,
+                        fontWeight = "bold",
+                        color = "#FFFFFF",
+                        textAlign = "center",
                     },
                 }
             }
             uiRoot:AddChild(overlay)
         end
-        -- 注册倒计时图片辉光 (居中显示)
-        local sw = graphics:GetWidth() / graphics:GetDPR()
-        local sh = graphics:GetHeight() / graphics:GetDPR()
-        local cx = (sw - imgSize) * 0.5
-        local cy = (sh - imgSize) * 0.5
-        VFXManager.SetBloomImages({
-            { src = imgSrc, x = cx, y = cy, w = imgSize, h = imgSize, rotate = 0, intensity = 1.8 },
-        })
     else
         -- 超出范围则移除
         local oldOverlay = uiRoot:FindById("countdownOverlay")
         if oldOverlay then oldOverlay:Remove() end
         VFXManager.ClearBloomImages()
+
+        -- 恢复中间提示区域显示
+        local middleArea = uiRoot:FindById("middleArea")
+        if middleArea then middleArea:SetStyle({ opacity = 1 }) end
     end
 end
 

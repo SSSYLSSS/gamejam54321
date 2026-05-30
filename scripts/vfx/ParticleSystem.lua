@@ -66,6 +66,53 @@ function ParticleSystem:Emit(x, y, count, opts)
     end
 end
 
+--- 从指定位置向目标点发射粒子 (四角向中央)
+---@param fromX number 起始X
+---@param fromY number 起始Y
+---@param toX number 目标X
+---@param toY number 目标Y
+---@param count number 粒子数量
+---@param opts table|nil 可选参数 {r, g, b, speed, life, radius, spread}
+function ParticleSystem:EmitToward(fromX, fromY, toX, toY, count, opts)
+    opts = opts or {}
+    local baseR = opts.r or 1.0
+    local baseG = opts.g or 0.85
+    local baseB = opts.b or 0.2
+    local speed = opts.speed or 300
+    local life = opts.life or 1.5
+    local radius = opts.radius or 5
+    local spread = opts.spread or 0.5  -- 角度散布(弧度)
+
+    -- 计算从起点到目标的方向角
+    local dx = toX - fromX
+    local dy = toY - fromY
+    local baseAngle = math.atan(dy, dx)
+
+    for _ = 1, count do
+        if #self.particles >= VFXConfig.MAX_PARTICLES then break end
+
+        -- 在基础方向上加随机偏移
+        local angle = baseAngle + (math.random() - 0.5) * spread
+        local spd = speed * (0.5 + math.random() * 0.5)
+
+        local p = {
+            x = fromX + (math.random() - 0.5) * 30,
+            y = fromY + (math.random() - 0.5) * 30,
+            vx = math.cos(angle) * spd,
+            vy = math.sin(angle) * spd,
+            life = life * (0.6 + math.random() * 0.4),
+            maxLife = life,
+            radius = radius * (0.5 + math.random() * 0.5),
+            r = baseR * (0.8 + math.random() * 0.2),
+            g = baseG * (0.8 + math.random() * 0.2),
+            b = baseB * (0.5 + math.random() * 0.5),
+            brightness = 1.4 + math.random() * 0.4,
+            noGravity = true,  -- 向目标飞行不受重力
+        }
+        table.insert(self.particles, p)
+    end
+end
+
 --- 发射向上喷射的粒子 (弃牌效果)
 ---@param x number
 ---@param y number
@@ -104,7 +151,9 @@ function ParticleSystem:Update(dt)
         else
             p.x = p.x + p.vx * dt
             p.y = p.y + p.vy * dt
-            p.vy = p.vy + gravity * dt
+            if not p.noGravity then
+                p.vy = p.vy + gravity * dt
+            end
             -- 亮度随生命衰减
             local lifeRatio = p.life / p.maxLife
             p.brightness = 1.0 + (p.brightness - 1.0) * lifeRatio
@@ -118,7 +167,8 @@ end
 function ParticleSystem:Render(ctx)
     for _, p in ipairs(self.particles) do
         local lifeRatio = p.life / p.maxLife
-        local alpha = lifeRatio
+        -- alpha 在生命后30%才开始衰减，前70%保持满不透明
+        local alpha = lifeRatio > 0.3 and 1.0 or (lifeRatio / 0.3)
         local radius = p.radius * (0.5 + lifeRatio * 0.5)
 
         local hdrR = p.r * p.brightness

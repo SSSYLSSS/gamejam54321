@@ -34,6 +34,11 @@ local function CreateMenuButton(text, color, onClick)
     }
 end
 
+--- 标题图片 widget 引用 (供外部每帧获取位置)
+MenuScene.titleWidgets = nil
+--- 标题图片配置 (size/rotate)
+MenuScene.titleConfigs = nil
+
 --- 构建主菜单 UI
 ---@param callbacks table {hasSave, onContinue, onStart, onMultiplayer, onStats, onSettings, onExit}
 ---@return table root
@@ -54,14 +59,21 @@ function MenuScene.Build(callbacks)
     table.insert(buttons, CreateMenuButton("设置", Colors.textDim, callbacks.onSettings))
     table.insert(buttons, CreateMenuButton("退出游戏", Colors.danger, callbacks.onExit))
 
-    -- 标题图片(五 四 三 21) - 大像素图在屏幕上方自由漂浮 + 倾斜
+    -- 标题图片(五 四 三 21) - 居中散列 + 浮动动画
     local smallSize = 300   -- 200 * 1.5
     local bigSize = 500
+    -- 五四三居中散列: 中心点分别在 30%, 50%, 70% 宽度
+    -- 四在正中(50%), 五在左(30%), 三在右(70%)
+    -- 21居中在四下方(中心点50%)
+    -- left = 中心百分比 - 半宽/屏幕宽(按844px逻辑宽估算)
+    local sw = graphics:GetWidth() / graphics:GetDPR()
+    local halfSmall = smallSize * 0.5
+    local halfBig = bigSize * 0.5
     local titleImages = {
-        { src = "pic/五.png", size = smallSize, x = "14%", y = "0%",  rotate = -12 },
-        { src = "pic/四.png", size = smallSize, x = "42%", y = "0%",  rotate = 0 },
-        { src = "pic/三.png", size = smallSize, x = "70%", y = "0%",  rotate = 10 },
-        { src = "pic/21.png", size = bigSize,   x = "38%", y = "9%",  rotate = -3 },
+        { src = "pic/五.png", size = smallSize, x = tostring(math.floor((0.30 * sw - halfSmall) / sw * 100)) .. "%", y = "0%",  rotate = -12 },
+        { src = "pic/四.png", size = smallSize, x = tostring(math.floor((0.50 * sw - halfSmall) / sw * 100)) .. "%", y = "0%",  rotate = 0 },
+        { src = "pic/三.png", size = smallSize, x = tostring(math.floor((0.70 * sw - halfSmall) / sw * 100)) .. "%", y = "0%",  rotate = 10 },
+        { src = "pic/21.png", size = bigSize,   x = tostring(math.floor((0.50 * sw - halfBig) / sw * 100)) .. "%",   y = "11%", rotate = -3 },
     }
     local titleWidgets = {}
     for i, img in ipairs(titleImages) do
@@ -77,6 +89,10 @@ function MenuScene.Build(callbacks)
         }
         table.insert(titleWidgets, w)
     end
+
+    -- 保存引用供外部位置跟踪
+    MenuScene.titleWidgets = titleWidgets
+    MenuScene.titleConfigs = titleImages
 
     -- 启动呼吸浮动动画(每个图片独立循环, 利用不同duration实现错开效果)
     for i, w in ipairs(titleWidgets) do
