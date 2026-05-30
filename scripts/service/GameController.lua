@@ -26,6 +26,12 @@ function GameController.NewGame()
     PhaseManager.StartNewRound(state)
 end
 
+--- 从存档恢复游戏(直接设置 state)
+---@param restoredState table 已恢复的 GameState 实例
+function GameController.RestoreGame(restoredState)
+    state = restoredState
+end
+
 --- 获取当前 GameState (只读查询用)
 ---@return table|nil
 function GameController.GetState()

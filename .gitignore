@@ -1,8 +1,2 @@
 .build/
 dist/
-logs/
-.cli/
-.tmp/
-*.meta
-.luarc.json
-.claude/

@@ -13,6 +13,13 @@ local GameScene = require("ui.scenes.GameScene")
 local VFXManager = require("vfx.VFXManager")
 local VFXConfig = require("vfx.VFXConfig")
 local CardWidget = require("ui.components.CardWidget")
+local TutorialScene = require("ui.scenes.TutorialScene")
+local AISystem = require("system.AISystem")
+local StatsSystem = require("system.StatsSystem")
+local SaveSystem = require("system.SaveSystem")
+local GameState = require("model.GameState")
+local PlayerState = require("model.PlayerState")
+local RoundState = require("model.RoundState")
 
 -- ============================================================================
 -- 全局状态
@@ -59,17 +66,36 @@ end
 -- 场景管理
 -- ============================================================================
 
+--- 保存当前游戏进度
+local function SaveCurrentGame()
+    local gs = GameController.GetState()
+    if gs and not gs:IsGameOver() then
+        SaveSystem.Save(gs, AISystem.GetDifficulty())
+    end
+end
+
 --- 切换到主菜单
 local function ShowMenu()
     currentScene = "menu"
     VFXManager.ClearParticles()
 
     local root = MenuScene.Build({
+        hasSave = SaveSystem.HasSave(),
+        onContinue = function()
+            ShowGame(true)  -- 从存档恢复
+        end,
         onStart = function()
-            ShowGame()
+            SaveSystem.Delete()  -- 新游戏时删除旧存档
+            ShowDifficultySelect()
         end,
         onMultiplayer = function()
             ShowMultiplayer()
+        end,
+        onTutorial = function()
+            ShowTutorial()
+        end,
+        onStats = function()
+            ShowStats()
         end,
         onSettings = function()
             ShowSettings()
@@ -81,14 +107,51 @@ local function ShowMenu()
     UI.SetRoot(root)
 end
 
+--- 切换到难度选择
+function ShowDifficultySelect()
+    currentScene = "difficulty"
+    VFXManager.ClearParticles()
+
+    local root = MenuScene.BuildDifficultySelect({
+        onSelect = function(difficulty)
+            AISystem.SetDifficulty(difficulty)
+            ShowGame()
+        end,
+        onBack = function()
+            ShowMenu()
+        end,
+    })
+    UI.SetRoot(root)
+end
+
 --- 切换到游戏
-function ShowGame()
+---@param fromSave boolean|nil 是否从存档恢复
+function ShowGame(fromSave)
     currentScene = "game"
     VFXManager.ClearParticles()
-    GameController.NewGame()
+
+    if fromSave then
+        -- 从存档恢复
+        local saveData = SaveSystem.Load()
+        if saveData then
+            local gs = SaveSystem.RestoreGameState(saveData, GameState, PlayerState, RoundState)
+            if gs then
+                GameController.RestoreGame(gs)
+                AISystem.SetDifficulty(saveData.difficulty or "normal")
+                SaveSystem.Delete()
+            else
+                GameController.NewGame()
+            end
+        else
+            GameController.NewGame()
+        end
+    else
+        GameController.NewGame()
+    end
 
     GameScene.SetCallbacks({
         onBackToMenu = function()
+            SaveCurrentGame()
             ShowMenu()
         end,
     })
@@ -97,8 +160,18 @@ function ShowGame()
     UI.SetRoot(root)
 
     -- 初始提示
-    GameScene.SetInfo(string.format("选择要弃置的牌（至多%d张），或跳过",
-        GameController.GetMaxDiscard()))
+    local phase = GameController.GetPhase()
+    local Constant = require("core.Constant")
+    if phase == Constant.PHASE.GAME_OVER then
+        GameScene.SetInfo("游戏已结束")
+    elseif phase == Constant.PHASE.POST_DISCARD then
+        GameScene.SetInfo("选择至多2张牌放回你的抽牌堆")
+    elseif phase == Constant.PHASE.POST_KEEP then
+        GameScene.SetInfo("选择至多1张牌保留至下一局")
+    else
+        GameScene.SetInfo(string.format("选择要弃置的牌（至多%d张），或跳过",
+            GameController.GetMaxDiscard()))
+    end
     GameScene.Refresh()
 end
 
@@ -106,6 +179,26 @@ end
 function ShowMultiplayer()
     currentScene = "multiplayer"
     local root = MenuScene.BuildMultiplayerNotice(function()
+        ShowMenu()
+    end)
+    UI.SetRoot(root)
+end
+
+--- 切换到统计页面
+function ShowStats()
+    currentScene = "stats"
+    VFXManager.ClearParticles()
+    local root = MenuScene.BuildStats(function()
+        ShowMenu()
+    end)
+    UI.SetRoot(root)
+end
+
+--- 切换到教程页面
+function ShowTutorial()
+    currentScene = "tutorial"
+    VFXManager.ClearParticles()
+    local root = TutorialScene.Build(function()
         ShowMenu()
     end)
     UI.SetRoot(root)
@@ -144,7 +237,10 @@ function Start()
         scale = UI.Scale.DEFAULT,
     })
 
-    -- 4. 显示主菜单
+    -- 4. 加载统计数据
+    StatsSystem.Load()
+
+    -- 5. 显示主菜单
     ShowMenu()
 
     -- 5. 订阅事件
@@ -182,7 +278,7 @@ function HandleKeyDown(eventType, eventData)
             if not GameScene.HandleEscape() then
                 ShowMenu()
             end
-        elseif currentScene == "settings" or currentScene == "multiplayer" then
+        elseif currentScene == "settings" or currentScene == "multiplayer" or currentScene == "difficulty" or currentScene == "stats" or currentScene == "tutorial" then
             ShowMenu()
         else
             engine:Exit()

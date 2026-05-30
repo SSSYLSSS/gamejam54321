@@ -1,5 +1,8 @@
 -- ============================================================================
--- system/AISystem.lua - AI 决策系统
+-- system/AISystem.lua - AI 决策系统(支持三种难度)
+-- easy: 随机决策，经常犯错
+-- normal: 基础策略(原逻辑)
+-- hard: 高级策略，考虑特殊牌效果和对手状态
 -- ============================================================================
 
 local Card = require("core.Card")
@@ -8,11 +11,98 @@ local GameConfig = require("core.GameConfig")
 
 local AISystem = {}
 
---- AI决策: 选择要弃置的牌索引
----@param hand table[] AI手牌
----@param turnIndex number 当前回合(1,2,3)
+--- AI 难度等级
+AISystem.DIFFICULTY = {
+    EASY = "easy",
+    NORMAL = "normal",
+    HARD = "hard",
+}
+
+-- 当前难度(默认普通)
+local currentDifficulty = AISystem.DIFFICULTY.NORMAL
+
+--- 设置AI难度
+---@param diff string "easy"|"normal"|"hard"
+function AISystem.SetDifficulty(diff)
+    currentDifficulty = diff or AISystem.DIFFICULTY.NORMAL
+end
+
+--- 获取当前难度
+---@return string
+function AISystem.GetDifficulty()
+    return currentDifficulty
+end
+
+-- ============================================================================
+-- 简单难度: 随机决策，有较高概率犯错
+-- ============================================================================
+
+--- 简单AI: 随机弃牌
+---@param hand table[]
+---@param turnIndex number
 ---@return number[]
-function AISystem.DecideDiscard(hand, turnIndex)
+local function easyDecideDiscard(hand, turnIndex)
+    local maxDiscard = GameConfig.MAX_DISCARD[turnIndex]
+    local discardIndices = {}
+
+    -- 30%概率完全不弃牌
+    if math.random() < 0.3 then
+        return {}
+    end
+
+    -- 随机弃1-2张牌(不管好坏)
+    local count = math.random(1, math.min(2, maxDiscard))
+    local available = {}
+    for i = 1, #hand do
+        table.insert(available, i)
+    end
+
+    for _ = 1, count do
+        if #available == 0 then break end
+        local pick = math.random(1, #available)
+        table.insert(discardIndices, available[pick])
+        table.remove(available, pick)
+    end
+
+    return discardIndices
+end
+
+--- 简单AI: 结算后随机保留
+---@param hand table[]
+---@return number[], number|nil
+local function easyDecidePostGame(hand)
+    -- 随机保留一张
+    local keepIdx = math.random(1, #hand)
+
+    -- 随机弃0-2张
+    local discardIndices = {}
+    local count = math.random(0, math.min(GameConfig.POST_DISCARD_MAX, #hand - 1))
+    local available = {}
+    for i = 1, #hand do
+        if i ~= keepIdx then
+            table.insert(available, i)
+        end
+    end
+
+    for _ = 1, count do
+        if #available == 0 then break end
+        local pick = math.random(1, #available)
+        table.insert(discardIndices, available[pick])
+        table.remove(available, pick)
+    end
+
+    return discardIndices, keepIdx
+end
+
+-- ============================================================================
+-- 普通难度: 基础策略(原始逻辑)
+-- ============================================================================
+
+--- 普通AI: 根据距21的距离决定弃牌
+---@param hand table[]
+---@param turnIndex number
+---@return number[]
+local function normalDecideDiscard(hand, turnIndex)
     local maxDiscard = GameConfig.MAX_DISCARD[turnIndex]
     local discardIndices = {}
 
@@ -26,7 +116,6 @@ function AISystem.DecideDiscard(hand, turnIndex)
     local distance = totalPoints - target
 
     if math.abs(distance) <= 2 then
-        -- 已经很接近21了，不弃牌
         return {}
     end
 
@@ -94,12 +183,10 @@ function AISystem.DecideDiscard(hand, turnIndex)
     return discardIndices
 end
 
---- AI决策: 结算后选牌(保留/弃置)
+--- 普通AI: 保留中等价值牌
 ---@param hand table[]
----@return number[] discardIndices 弃置到牌堆的索引
----@return number|nil keepIndex 保留到下局的索引
-function AISystem.DecidePostGame(hand)
-    -- 保留最好的牌(中等点数最优)
+---@return number[], number|nil
+local function normalDecidePostGame(hand)
     local bestKeepIdx = nil
     local bestKeepScore = -1
     for idx, card in ipairs(hand) do
@@ -114,7 +201,6 @@ function AISystem.DecidePostGame(hand)
         end
     end
 
-    -- 弃置至多2张(点数最大的)
     local sortedIndices = {}
     for idx = 1, #hand do
         if idx ~= bestKeepIdx then
@@ -132,6 +218,289 @@ function AISystem.DecidePostGame(hand)
     end
 
     return discardIndices, bestKeepIdx
+end
+
+-- ============================================================================
+-- 困难难度: 高级策略，考虑特殊牌效果
+-- ============================================================================
+
+--- 计算牌的战略价值(困难AI用)
+---@param card table
+---@param hand table[]
+---@param totalPoints number
+---@return number score 越高越值得保留
+local function calculateCardStrategicValue(card, hand, totalPoints)
+    local score = 0
+    local target = GameConfig.TARGET_POINTS
+    local distance = totalPoints - target
+
+    -- 7: 极高保留价值(三7必胜+不可被改变)
+    if card.rank == 7 then
+        local sevenCount = 0
+        for _, c in ipairs(hand) do
+            if c.rank == 7 then sevenCount = sevenCount + 1 end
+        end
+        score = score + 15
+        if sevenCount >= 2 then score = score + 10 end  -- 接近三7
+        return score
+    end
+
+    -- A: 高战略价值(翻倍对手同花色)
+    if card.rank == 1 then
+        score = score + 12
+        return score
+    end
+
+    -- K: 考虑K效果(对方取整+自己-5取整，点数高时有利)
+    if card.rank == 13 then
+        if distance >= 5 then
+            score = score + 8  -- 点数偏高时K能让自己-5
+        else
+            score = score + 3  -- 点数偏低时K反而不利
+        end
+        return score
+    end
+
+    -- Q: 使对方最小牌变0，战略价值高
+    if card.rank == 12 then
+        score = score + 10
+        return score
+    end
+
+    -- J: 弃置有翻倍效果，留着不如弃掉
+    if card.rank == 11 then
+        score = score - 2  -- 低保留价值，鼓励弃置
+        return score
+    end
+
+    -- 9: 灵活牌(0或9)，在接近21时极有价值
+    if card.rank == 9 then
+        score = score + 8
+        if math.abs(distance) <= 9 then score = score + 4 end
+        return score
+    end
+
+    -- 8: 降低己方普通牌点数，配合其他牌
+    if card.rank == 8 then
+        local normalCount = 0
+        for _, c in ipairs(hand) do
+            if Card.IsNormal(c) then normalCount = normalCount + 1 end
+        end
+        score = score + 3 + normalCount
+        return score
+    end
+
+    -- 10: 弃置后+1，根据点数差距决定
+    if card.rank == 10 then
+        if distance >= 0 then
+            score = score - 1  -- 点数够了，10本身0点但弃置有+1
+        else
+            score = score + 2
+        end
+        return score
+    end
+
+    -- 普通牌(2-6): 根据距离21的贡献决定价值
+    local pts = Card.GetBasePoints(card)
+    if distance > 0 then
+        -- 超过21: 大点数牌价值低
+        score = score - pts
+    elseif distance < -5 then
+        -- 远低于21: 小点数牌价值低
+        score = score + pts
+    else
+        -- 接近21: 能精确凑数的牌价值高
+        local need = target - (totalPoints - pts)
+        if need >= 2 and need <= 6 then
+            score = score + 5
+        else
+            score = score + 3
+        end
+    end
+
+    return score
+end
+
+--- 困难AI: 策略性弃牌
+---@param hand table[]
+---@param turnIndex number
+---@return number[]
+local function hardDecideDiscard(hand, turnIndex)
+    local maxDiscard = GameConfig.MAX_DISCARD[turnIndex]
+
+    -- 计算总点数
+    local totalPoints = 0
+    for _, card in ipairs(hand) do
+        totalPoints = totalPoints + Card.GetBasePoints(card)
+    end
+
+    local target = GameConfig.TARGET_POINTS
+
+    -- 如果已经很接近21, 考虑是否需要弃牌
+    if math.abs(totalPoints - target) <= 1 then
+        -- 检查是否有J值得弃(利用弃置翻倍效果)
+        for i, card in ipairs(hand) do
+            if card.rank == 11 then
+                return { i }  -- 弃J触发翻倍对手
+            end
+        end
+        return {}
+    end
+
+    -- 计算每张牌的战略价值
+    local cardValues = {}
+    for i, card in ipairs(hand) do
+        local value = calculateCardStrategicValue(card, hand, totalPoints)
+        table.insert(cardValues, { idx = i, value = value, card = card })
+    end
+
+    -- 按价值升序排列(价值低的优先弃掉)
+    table.sort(cardValues, function(a, b) return a.value < b.value end)
+
+    local discardIndices = {}
+
+    -- 策略: 弃掉价值最低的牌，同时考虑点数优化
+    local removedPoints = 0
+    for _, entry in ipairs(cardValues) do
+        if #discardIndices >= maxDiscard then break end
+
+        local pts = Card.GetBasePoints(entry.card)
+        local newTotal = totalPoints - removedPoints - pts
+
+        -- 不弃7(太有价值)
+        if entry.card.rank == 7 then
+            goto continue
+        end
+
+        -- J: 优先弃(有弃置翻倍效果)
+        if entry.card.rank == 11 then
+            table.insert(discardIndices, entry.idx)
+            removedPoints = removedPoints + pts
+            goto continue
+        end
+
+        -- 如果弃掉后点数更接近21, 或者当前点数已超21
+        if totalPoints - removedPoints > target then
+            -- 超过21: 弃掉大点数的非战略牌
+            if entry.value < 8 then
+                table.insert(discardIndices, entry.idx)
+                removedPoints = removedPoints + pts
+            end
+        elseif totalPoints - removedPoints < target - 3 then
+            -- 远低于21: 弃掉低价值的小牌(反直觉但为了腾位置)
+            if entry.value < 5 and pts <= 3 then
+                table.insert(discardIndices, entry.idx)
+                removedPoints = removedPoints + pts
+            end
+        else
+            -- 接近21: 只弃J或极低价值牌
+            if entry.value < 0 then
+                table.insert(discardIndices, entry.idx)
+                removedPoints = removedPoints + pts
+            end
+        end
+
+        ::continue::
+    end
+
+    return discardIndices
+end
+
+--- 困难AI: 策略性保留
+---@param hand table[]
+---@return number[], number|nil
+local function hardDecidePostGame(hand)
+    -- 按战略价值评估每张牌(用于下一局)
+    local totalPoints = 0
+    for _, card in ipairs(hand) do
+        totalPoints = totalPoints + Card.GetBasePoints(card)
+    end
+
+    local bestKeepIdx = nil
+    local bestKeepScore = -999
+    for idx, card in ipairs(hand) do
+        local score = 0
+        -- 保留策略: 偏好特殊牌(A/Q/9/7)和适中点数牌
+        if card.rank == 7 then
+            score = 20  -- 7最优先保留(三7规则)
+        elseif card.rank == 1 then
+            score = 15  -- A翻倍效果
+        elseif card.rank == 12 then
+            score = 13  -- Q使对方变0
+        elseif card.rank == 9 then
+            score = 12  -- 9灵活(0或9)
+        elseif card.rank == 8 then
+            score = 8   -- 8降己方普通牌
+        elseif card.rank == 13 then
+            score = 6   -- K效果风险较高
+        elseif card.rank == 11 then
+            score = 4   -- J弃了更好
+        elseif card.rank == 10 then
+            score = 3   -- 10弃了+1
+        else
+            -- 普通牌: 4-5点最佳(中间值)
+            local pts = Card.GetBasePoints(card)
+            score = 7 - math.abs(pts - 4.5) * 2
+        end
+
+        if score > bestKeepScore then
+            bestKeepScore = score
+            bestKeepIdx = idx
+        end
+    end
+
+    -- 弃牌: 优先弃掉J和10(利用弃置效果)，然后弃价值低的
+    local sortedIndices = {}
+    for idx = 1, #hand do
+        if idx ~= bestKeepIdx then
+            local card = hand[idx]
+            local priority = 0
+            if card.rank == 11 then priority = 100 end  -- J最优先弃(翻倍对手)
+            if card.rank == 10 then priority = 50 end   -- 10弃了+1
+            table.insert(sortedIndices, { idx = idx, priority = priority })
+        end
+    end
+    table.sort(sortedIndices, function(a, b) return a.priority > b.priority end)
+
+    local discardIndices = {}
+    local discardCount = math.min(GameConfig.POST_DISCARD_MAX, #sortedIndices)
+    for j = 1, discardCount do
+        table.insert(discardIndices, sortedIndices[j].idx)
+    end
+
+    return discardIndices, bestKeepIdx
+end
+
+-- ============================================================================
+-- 公开接口(根据难度分派)
+-- ============================================================================
+
+--- AI决策: 选择要弃置的牌索引
+---@param hand table[] AI手牌
+---@param turnIndex number 当前回合(1,2,3)
+---@return number[]
+function AISystem.DecideDiscard(hand, turnIndex)
+    if currentDifficulty == AISystem.DIFFICULTY.EASY then
+        return easyDecideDiscard(hand, turnIndex)
+    elseif currentDifficulty == AISystem.DIFFICULTY.HARD then
+        return hardDecideDiscard(hand, turnIndex)
+    else
+        return normalDecideDiscard(hand, turnIndex)
+    end
+end
+
+--- AI决策: 结算后选牌(保留/弃置)
+---@param hand table[]
+---@return number[] discardIndices 弃置到牌堆的索引
+---@return number|nil keepIndex 保留到下局的索引
+function AISystem.DecidePostGame(hand)
+    if currentDifficulty == AISystem.DIFFICULTY.EASY then
+        return easyDecidePostGame(hand)
+    elseif currentDifficulty == AISystem.DIFFICULTY.HARD then
+        return hardDecidePostGame(hand)
+    else
+        return normalDecidePostGame(hand)
+    end
 end
 
 return AISystem

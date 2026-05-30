@@ -6,8 +6,12 @@ local UI = require("urhox-libs/UI")
 local Colors = require("ui.Colors")
 local Card = require("core.Card")
 local Constant = require("core.Constant")
+local GameConfig = require("core.GameConfig")
 local CardWidget = require("ui.components.CardWidget")
 local GameController = require("service.GameController")
+local AISystem = require("system.AISystem")
+local StatsSystem = require("system.StatsSystem")
+local SaveSystem = require("system.SaveSystem")
 local VFXManager = require("vfx.VFXManager")
 
 local GameScene = {}
@@ -23,6 +27,12 @@ local aiHandWidgets = {}
 
 -- 结算翻牌动画状态
 local settlementAnim = nil   -- nil=无动画, table=动画进行中
+
+-- 局间过渡动画状态
+local transitionAnim = nil   -- nil=无动画, {text, timer, duration, phase}
+
+-- 统计记录防重复
+local gameStatsRecorded = false
 
 -- 回调(由 UIManager 设置)
 local sceneCallbacks = {}
@@ -42,6 +52,7 @@ end
 function GameScene.Build()
     selectedCards = {}
     viewingPile = nil
+    gameStatsRecorded = false
 
     uiRoot = UI.Panel {
         id = "root",
@@ -118,9 +129,26 @@ function GameScene.ClearSelection()
     selectedCards = {}
 end
 
---- 每帧更新 (驱动结算翻牌动画 + 自动推进)
+--- 每帧更新 (驱动结算翻牌动画 + 局间过渡动画)
 ---@param dt number
 function GameScene.Update(dt)
+    -- 局间过渡动画
+    if transitionAnim then
+        transitionAnim.timer = transitionAnim.timer + dt
+        local t = transitionAnim.timer
+        local dur = transitionAnim.duration
+
+        if t >= dur then
+            -- 动画结束，移除覆盖层并进入新回合
+            GameScene._EndTransition()
+        else
+            -- 更新覆盖层透明度动画
+            GameScene._UpdateTransitionOverlay()
+        end
+        return  -- 过渡期间不处理其他动画
+    end
+
+    -- 结算翻牌动画
     if not settlementAnim then return end
     local anim = settlementAnim
     anim.timer = anim.timer + dt
@@ -728,6 +756,26 @@ function GameScene._GetSelectedIndices()
 end
 
 -- ============================================================================
+-- 内部: 统计记录
+-- ============================================================================
+
+--- 记录游戏结束统计(防重复) + 删除存档
+local function recordGameOverStats()
+    if gameStatsRecorded then return end
+    gameStatsRecorded = true
+
+    local winner = GameController.GetGameWinner()
+    local pw, aw = GameController.GetScore()
+    local difficulty = AISystem.GetDifficulty()
+    local lastResult = GameController.GetLastResult()
+    local hadSeven = lastResult and lastResult.sevenRuleTriggered or false
+    local playerPts = lastResult and lastResult.playerPoints or nil
+
+    StatsSystem.RecordGame(winner or "tie", difficulty, pw, aw, hadSeven, playerPts)
+    SaveSystem.Delete()
+end
+
+-- ============================================================================
 -- 内部: 按钮回调
 -- ============================================================================
 
@@ -826,6 +874,7 @@ function GameScene._OnAction()
 
         local newPhase = GameController.GetPhase()
         if newPhase == Constant.PHASE.GAME_OVER then
+            recordGameOverStats()
             local winner = GameController.GetGameWinner()
             local pw, aw = GameController.GetScore()
             GameScene.SetInfo(string.format("游戏结束! %s获胜!\n最终比分: %d - %d",
@@ -839,6 +888,7 @@ function GameScene._OnAction()
 
     if phase == Constant.PHASE.ROUND_END then
         if GameController.IsGameOver() then
+            recordGameOverStats()
             local winner = GameController.GetGameWinner()
             local pw, aw = GameController.GetScore()
             GameScene.SetInfo(string.format("游戏结束! %s获胜!\n最终比分: %d - %d",
@@ -847,10 +897,9 @@ function GameScene._OnAction()
             local gs = GameController.GetState()
             if gs then gs.round.phase = Constant.PHASE.GAME_OVER end
         else
-            GameController.StartNextRound()
-            selectedCards = {}
-            GameScene.SetInfo(string.format("选择要弃置的牌（至多%d张），或跳过",
-                GameController.GetMaxDiscard()))
+            -- 启动局间过渡动画(动画结束后自动StartNextRound)
+            local nextRound = GameController.GetRoundNumber() + 1
+            GameScene._StartTransition(nextRound)
         end
         GameScene.Refresh()
         return
@@ -890,6 +939,7 @@ function GameScene._OnSkip()
         selectedCards = {}
         local newPhase = GameController.GetPhase()
         if newPhase == Constant.PHASE.GAME_OVER then
+            recordGameOverStats()
             local winner = GameController.GetGameWinner()
             local pw, aw = GameController.GetScore()
             GameScene.SetInfo(string.format("游戏结束! %s获胜!\n最终比分: %d - %d",
@@ -995,6 +1045,87 @@ function GameScene._UpdateSettlementOverlay()
     end
 end
 
+--- 生成效果描述列表(展示每张牌触发了什么效果)
+---@param hand table[] 手牌
+---@param details table|nil 计算详情
+---@param isPlayer boolean 是否是玩家
+---@return table[] UI children
+local function buildEffectDetails(hand, details, isPlayer)
+    if not details then return {} end
+
+    local effects = {}
+    local effectColor = { 200, 180, 120, 255 }
+
+    -- K 效果
+    if details.kingApplied then
+        table.insert(effects, UI.Label {
+            text = "K: 对方点数取整, 己方-5后取整",
+            fontSize = 11,
+            fontColor = { 255, 160, 60, 255 },
+        })
+    end
+
+    -- A 翻倍效果(被对方A翻倍)
+    if details.aceEffects and #details.aceEffects > 0 then
+        local suits = {}
+        for _, s in ipairs(details.aceEffects) do
+            table.insert(suits, Constant.SUIT_SYMBOLS[s] or s)
+        end
+        table.insert(effects, UI.Label {
+            text = string.format("被对方A翻倍花色: %s", table.concat(suits, " ")),
+            fontSize = 11,
+            fontColor = { 255, 120, 120, 255 },
+        })
+    end
+
+    -- J 翻倍效果
+    if details.jackDoubleEffect then
+        table.insert(effects, UI.Label {
+            text = "被对方J弃置效果翻倍(普通牌x2)",
+            fontSize = 11,
+            fontColor = { 200, 100, 255, 255 },
+        })
+    end
+
+    -- Q 效果
+    if details.queenNullified then
+        table.insert(effects, UI.Label {
+            text = "被对方Q效果: 最小牌点数归0",
+            fontSize = 11,
+            fontColor = { 180, 80, 200, 255 },
+        })
+    end
+
+    -- 8 效果
+    if details.eightEffects and details.eightEffects > 0 then
+        table.insert(effects, UI.Label {
+            text = string.format("8效果: 己方普通牌各-%d点", details.eightEffects),
+            fontSize = 11,
+            fontColor = effectColor,
+        })
+    end
+
+    -- 9 灵活
+    if details.nineFlexSaved and details.nineFlexSaved > 0 then
+        table.insert(effects, UI.Label {
+            text = string.format("9灵活: 选择视为0(节省%d点)", details.nineFlexSaved),
+            fontSize = 11,
+            fontColor = effectColor,
+        })
+    end
+
+    -- 10 弃置加分
+    if details.tenBonus and details.tenBonus > 0 then
+        table.insert(effects, UI.Label {
+            text = string.format("10弃置奖励: +%d点", details.tenBonus),
+            fontSize = 11,
+            fontColor = { 100, 200, 100, 255 },
+        })
+    end
+
+    return effects
+end
+
 --- 构建结算弹窗的内容children
 ---@return table[]
 function GameScene._BuildSettlementContent()
@@ -1010,18 +1141,10 @@ function GameScene._BuildSettlementContent()
     if allRevealed then
         aiPtsShown = anim.result.aiPoints
     else
-        -- 逐步累加已翻开牌的基础点数
         for i = 1, revealed do
             local card = anim.aiHand[i]
             if card then
-                local basePts = Card.GetBasePoints(card)
-                -- 普通牌(2-6)直接加，特殊牌按效果类型标注
-                if card.rank >= 2 and card.rank <= 6 then
-                    aiPtsShown = aiPtsShown + basePts
-                elseif card.rank >= 7 and card.rank <= 10 then
-                    aiPtsShown = aiPtsShown + basePts
-                end
-                -- J/Q/K/A/Joker 基础点数为0或特殊
+                aiPtsShown = aiPtsShown + Card.GetBasePoints(card)
             end
         end
     end
@@ -1045,6 +1168,24 @@ function GameScene._BuildSettlementContent()
     -- 点数显示
     local aiPtsText = allRevealed and string.format("%d 点", aiPtsShown) or string.format("%d 点...", aiPtsShown)
     local playerPtsText = string.format("%d 点", playerPts)
+
+    -- 距离21的描述
+    local aiDistText = ""
+    local playerDistText = ""
+    if allRevealed and not anim.result.sevenRuleTriggered then
+        local aiDist = math.abs(GameConfig.TARGET_POINTS - aiPtsShown)
+        local playerDist = math.abs(GameConfig.TARGET_POINTS - playerPts)
+        aiDistText = string.format("(距21: %d)", aiDist)
+        playerDistText = string.format("(距21: %d)", playerDist)
+    end
+
+    -- 效果详情(全部翻开后显示)
+    local aiEffectWidgets = {}
+    local playerEffectWidgets = {}
+    if allRevealed and not anim.result.sevenRuleTriggered then
+        aiEffectWidgets = buildEffectDetails(anim.aiHand, anim.result.aiDetails, false)
+        playerEffectWidgets = buildEffectDetails(anim.playerHand, anim.result.playerDetails, true)
+    end
 
     -- 结果文字(全部翻开后显示)
     local resultChildren = {}
@@ -1089,43 +1230,59 @@ function GameScene._BuildSettlementContent()
         })
     end
 
+    -- 构建AI区域children
+    local aiAreaChildren = {
+        UI.Panel {
+            flexDirection = "row", gap = 4, alignItems = "center",
+            children = {
+                UI.Label { text = "AI:", fontSize = 13, fontColor = Colors.textDim },
+                UI.Label { text = aiPtsText, fontSize = 15, fontColor = { 255, 180, 80, 255 } },
+                UI.Label { text = aiDistText, fontSize = 11, fontColor = Colors.textDim },
+            }
+        },
+        UI.Panel {
+            flexDirection = "row", gap = 6, flexWrap = "wrap", justifyContent = "center",
+            children = aiCardWidgets,
+        },
+    }
+    -- 追加AI效果详情
+    for _, w in ipairs(aiEffectWidgets) do
+        table.insert(aiAreaChildren, w)
+    end
+
+    -- 构建玩家区域children
+    local playerAreaChildren = {
+        UI.Panel {
+            flexDirection = "row", gap = 4, alignItems = "center",
+            children = {
+                UI.Label { text = "你:", fontSize = 13, fontColor = Colors.textDim },
+                UI.Label { text = playerPtsText, fontSize = 15, fontColor = Colors.success },
+                UI.Label { text = playerDistText, fontSize = 11, fontColor = Colors.textDim },
+            }
+        },
+        UI.Panel {
+            flexDirection = "row", gap = 6, flexWrap = "wrap", justifyContent = "center",
+            children = playerCardWidgets,
+        },
+    }
+    -- 追加玩家效果详情
+    for _, w in ipairs(playerEffectWidgets) do
+        table.insert(playerAreaChildren, w)
+    end
+
     return {
         UI.Label { text = "结算", fontSize = 18, fontColor = Colors.gold },
         -- AI 区域
         UI.Panel {
             width = "100%", gap = 6, alignItems = "center",
-            children = {
-                UI.Panel {
-                    flexDirection = "row", gap = 4, alignItems = "center",
-                    children = {
-                        UI.Label { text = "AI:", fontSize = 13, fontColor = Colors.textDim },
-                        UI.Label { text = aiPtsText, fontSize = 15, fontColor = { 255, 180, 80, 255 } },
-                    }
-                },
-                UI.Panel {
-                    flexDirection = "row", gap = 6, flexWrap = "wrap", justifyContent = "center",
-                    children = aiCardWidgets,
-                },
-            }
+            children = aiAreaChildren,
         },
         -- 分隔
         UI.Panel { width = "80%", height = 1, backgroundColor = Colors.menuBorder },
         -- 玩家区域
         UI.Panel {
             width = "100%", gap = 6, alignItems = "center",
-            children = {
-                UI.Panel {
-                    flexDirection = "row", gap = 4, alignItems = "center",
-                    children = {
-                        UI.Label { text = "你:", fontSize = 13, fontColor = Colors.textDim },
-                        UI.Label { text = playerPtsText, fontSize = 15, fontColor = Colors.success },
-                    }
-                },
-                UI.Panel {
-                    flexDirection = "row", gap = 6, flexWrap = "wrap", justifyContent = "center",
-                    children = playerCardWidgets,
-                },
-            }
+            children = playerAreaChildren,
         },
         -- 分隔
         UI.Panel { width = "80%", height = 1, backgroundColor = Colors.menuBorder },
@@ -1150,6 +1307,7 @@ function GameScene._CloseSettlementAndAdvance()
     -- 比分已达胜利条件时跳过二!/一!直接结束
     if GameController.IsGameOver() then
         GameController.SkipToGameOver()
+        recordGameOverStats()
         selectedCards = {}
         GameScene.Refresh()
         return
@@ -1437,6 +1595,90 @@ function GameScene._OnJackPick(source)
         end
         GameScene.Refresh()
     end
+end
+
+-- ============================================================================
+-- 内部: 局间过渡动画
+-- ============================================================================
+
+--- 启动局间过渡动画
+---@param roundNum number 即将开始的局数
+function GameScene._StartTransition(roundNum)
+    local pw, aw = GameController.GetScore()
+    transitionAnim = {
+        timer = 0,
+        duration = 1.8,  -- 总时长1.8秒
+        roundNum = roundNum,
+        scoreText = string.format("比分  %d : %d", pw, aw),
+    }
+    GameScene._CreateTransitionOverlay()
+end
+
+--- 创建过渡覆盖层
+function GameScene._CreateTransitionOverlay()
+    if not uiRoot then return end
+    -- 移除旧的
+    local old = uiRoot:FindById("transitionOverlay")
+    if old then old:Remove() end
+
+    local anim = transitionAnim
+    if not anim then return end
+
+    local overlay = UI.Panel {
+        id = "transitionOverlay",
+        width = "100%",
+        height = "100%",
+        position = "absolute",
+        backgroundColor = { 10, 15, 30, 220 },
+        justifyContent = "center",
+        alignItems = "center",
+        gap = 12,
+        children = {
+            UI.Label {
+                id = "transRoundLabel",
+                text = string.format("第 %d 局", anim.roundNum),
+                fontSize = 32,
+                fontColor = Colors.gold,
+                textAlign = "center",
+            },
+            UI.Label {
+                id = "transScoreLabel",
+                text = anim.scoreText,
+                fontSize = 16,
+                fontColor = Colors.text,
+                textAlign = "center",
+            },
+            UI.Panel {
+                width = 60,
+                height = 3,
+                backgroundColor = Colors.accent,
+                borderRadius = 2,
+                marginTop = 8,
+            },
+        }
+    }
+    uiRoot:AddChild(overlay)
+end
+
+--- 更新过渡覆盖层(可扩展为渐变动画)
+function GameScene._UpdateTransitionOverlay()
+    -- 当前实现为静态展示，可未来扩展淡入淡出
+end
+
+--- 结束过渡动画，进入新回合
+function GameScene._EndTransition()
+    transitionAnim = nil
+    -- 移除覆盖层
+    if uiRoot then
+        local overlay = uiRoot:FindById("transitionOverlay")
+        if overlay then overlay:Remove() end
+    end
+    -- 开始新回合
+    GameController.StartNextRound()
+    selectedCards = {}
+    GameScene.SetInfo(string.format("选择要弃置的牌（至多%d张），或跳过",
+        GameController.GetMaxDiscard()))
+    GameScene.Refresh()
 end
 
 return GameScene
