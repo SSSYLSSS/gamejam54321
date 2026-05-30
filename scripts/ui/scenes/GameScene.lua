@@ -168,7 +168,7 @@ function GameScene.Update(dt)
             else
                 SFXManager.Play("flipCard")
             end
-            -- AI小王延迟效果: 翻到小王时触发玩家手牌视觉移除
+            -- AI小王延迟效果: 翻到小王时触发玩家手牌半透明化+光效
             if anim.aiSmallJokerIdx and anim.revealedCount >= anim.aiSmallJokerIdx and not anim.jokerRevealTriggered then
                 anim.jokerRevealTriggered = true
                 -- 重新计算玩家裸分(用真实手牌)
@@ -177,6 +177,8 @@ function GameScene.Update(dt)
                 local emptyHand = {}
                 anim.playerRawPoints, _ = RuleEngine.CalculatePoints(anim.playerHand, emptyHand,
                     gs and gs.player or nil, nil)
+                -- 发射光效: 从小王→被移除的玩家牌
+                GameScene._EmitSmallJokerBeam()
             end
             GameScene._UpdateSettlementOverlay()
         end
@@ -1497,6 +1499,8 @@ function GameScene._CreateSettlementOverlay()
     -- 翻牌时不创建遮挡窗口，只在屏幕中央显示倒计时图片
     -- AI手牌直接在游戏界面的aiHandPanel中逐张翻开
     GameScene._UpdateAIHandInPlace()
+    -- 玩家手牌使用 displayPlayerHand 显示(包含可能被小王移除的牌)
+    GameScene._UpdatePlayerHandInPlace()
     GameScene._UpdateCountdownOverlay()
 end
 
@@ -1657,10 +1661,64 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
     end
 end
 
+--- 小王翻出时发射光效: 从AI小王→被移除的玩家牌
+function GameScene._EmitSmallJokerBeam()
+    local anim = settlementAnim
+    if not anim or not anim.aiSmallJokerIdx or not anim.aiSmallJokerRemoved then return end
+
+    local sw = graphics:GetWidth() / graphics:GetDPR()
+    local sh = graphics:GetHeight() / graphics:GetDPR()
+
+    -- AI小王位置(复用 _TriggerSkillBeamVFX 的坐标估算逻辑)
+    local aiCount = #anim.aiHand
+    local aiCardW = 120
+    local aiCardH = 168
+    local aiTotalW = aiCount * aiCardW + (aiCount - 1) * 12
+    local centerAreaLeft = 90
+    local centerAreaW = sw - 180
+    local aiStartX = centerAreaLeft + (centerAreaW - aiTotalW) * 0.5
+    local aiY = 50 + 6 + 13 + 6 + aiCardH * 0.5
+
+    local srcX = aiStartX + (anim.aiSmallJokerIdx - 1) * (aiCardW + 12) + aiCardW * 0.5
+    local srcY = aiY
+
+    -- 被移除的玩家牌位置(在 displayPlayerHand 的末尾)
+    local playerHand = anim.displayPlayerHand or anim.playerHand
+    local playerCount = #playerHand
+    local removedIdx = playerCount  -- 被移除的牌在末尾
+
+    local playerCardW = 216
+    local playerCardH = 300
+    local playerTotalW = playerCount * playerCardW + (playerCount - 1) * 12
+    local playerStartX = centerAreaLeft + (centerAreaW - playerTotalW) * 0.5
+    local playerY = sh - 60 - 6 - 13 - 6 - playerCardH * 0.5
+
+    local destX = playerStartX + (removedIdx - 1) * (playerCardW + 12) + playerCardW * 0.5
+    local destY = playerY
+
+    -- 发射紫色光束连接两张牌
+    VFXManager.EmitLightBeam(srcX, srcY, destX, destY, {
+        r = 0.7, g = 0.2, b = 1.0,
+        duration = 1.5,
+    })
+    -- 在被移除的玩家牌上方飘字提示
+    VFXManager.EmitFloatingText(destX, destY - playerCardH * 0.5 - 10, "移除!", {
+        r = 0.7, g = 0.2, b = 1.0,
+        duration = 1.4,
+        fontSize = 18,
+    })
+end
+
 --- 更新结算内容(每翻一张牌时调用)
 function GameScene._UpdateSettlementOverlay()
     -- 在游戏界面直接翻开AI手牌
     GameScene._UpdateAIHandInPlace()
+
+    -- 更新玩家手牌(结算期间用 displayPlayerHand, 支持小王半透明化)
+    GameScene._UpdatePlayerHandInPlace()
+
+    -- 显示AI当前累计点数
+    GameScene._UpdateAIPointsDuringReveal()
 
     -- 翻牌时触发技能影响光线特效
     local anim = settlementAnim
@@ -1711,6 +1769,61 @@ function GameScene._UpdateAIHandInPlace()
         end
         panel:AddChild(widget)
         table.insert(aiHandWidgets, widget)
+    end
+end
+
+--- 结算时更新玩家手牌显示(小王触发时半透明化被移除的牌)
+function GameScene._UpdatePlayerHandInPlace()
+    local anim = settlementAnim
+    if not anim then return end
+    local panel = uiRoot:FindById("playerHandPanel")
+    if not panel then return end
+
+    -- 清理旧组件
+    for _, w in ipairs(playerHandWidgets) do
+        if w and w.Remove then w:Remove() end
+    end
+    playerHandWidgets = {}
+    panel:ClearChildren()
+
+    -- 使用 displayPlayerHand 显示(包含被小王移除的牌)
+    local hand = anim.displayPlayerHand or anim.playerHand
+    local removedCard = anim.aiSmallJokerRemoved
+
+    for i, card in ipairs(hand) do
+        local widget = CardWidget.Create(card, { skipTooltip = true })
+        -- 判断是否是被小王移除的那张牌(在列表末尾)
+        local isRemovedCard = removedCard and (i == #hand) and (#hand > #anim.playerHand)
+        if isRemovedCard and anim.jokerRevealTriggered then
+            widget:SetStyle({ opacity = 0.3 })
+        end
+        panel:AddChild(widget)
+        table.insert(playerHandWidgets, widget)
+    end
+end
+
+--- 翻牌期间显示AI当前累计点数
+function GameScene._UpdateAIPointsDuringReveal()
+    local anim = settlementAnim
+    if not anim then return end
+    local aiLabel = uiRoot:FindById("aiLabel")
+    if not aiLabel then return end
+
+    if anim.revealedCount > 0 then
+        -- 用已翻开的AI牌计算当前点数
+        local RuleEngine = require("system.RuleEngine")
+        local revealedHand = {}
+        for i = 1, anim.revealedCount do
+            table.insert(revealedHand, anim.aiHand[i])
+        end
+        -- 计算AI已翻牌的裸分(使用玩家手牌作为对手牌来算交互效果)
+        local gs = GameController.GetState()
+        local playerHand = anim.displayPlayerHand or anim.playerHand
+        local aiPts, _ = RuleEngine.CalculatePoints(revealedHand, playerHand,
+            gs and gs.ai or nil, gs and gs.player or nil)
+        aiLabel:SetText(string.format("AI 对手 (当前: %d点)", aiPts))
+    else
+        aiLabel:SetText("AI 对手")
     end
 end
 
@@ -2026,6 +2139,9 @@ function GameScene._CloseSettlementOverlay()
     local cdOverlay = uiRoot:FindById("countdownOverlay")
     if cdOverlay then cdOverlay:Remove() end
     VFXManager.ClearBloomImages()
+    -- 恢复AI标签
+    local aiLabel = uiRoot:FindById("aiLabel")
+    if aiLabel then aiLabel:SetText("AI 对手") end
 end
 
 --- 关闭结算弹窗并自动推进到POST_DISCARD阶段(或直接结束游戏)
