@@ -11,6 +11,7 @@ local Card = require("core.Card")
 local Colors = require("ui.Colors")
 local CardWidget = require("ui.components.CardWidget")
 local VFXManager = require("vfx.VFXManager")
+local SFXManager = require("system.SFXManager")
 
 local Client = {}
 
@@ -145,40 +146,46 @@ local function RefreshUI()
             width = 130, height = 38, fontSize = 13,
             variant = "primary",
             disabled = #selectedIndices_ == 0,
-            onClick = function() SendDiscard() end,
+            onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+            onClick = function() SFXManager.Play("buttonPress"); SendDiscard() end,
         })
         table.insert(buttons, UI.Button {
             text = "跳过",
             width = 80, height = 38, fontSize = 13,
             fontColor = Colors.textDim,
-            onClick = function() SendSkip() end,
+            onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+            onClick = function() SFXManager.Play("buttonPress"); SendSkip() end,
         })
     elseif phase_ == "post_discard" then
         table.insert(buttons, UI.Button {
             text = string.format("放回牌堆 (%d/%d)", #selectedIndices_, GameConfig.POST_DISCARD_MAX),
             width = 160, height = 38, fontSize = 13,
             variant = "primary",
-            onClick = function() SendPostDiscard() end,
+            onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+            onClick = function() SFXManager.Play("buttonPress"); SendPostDiscard() end,
         })
         table.insert(buttons, UI.Button {
             text = "跳过",
             width = 80, height = 38, fontSize = 13,
             fontColor = Colors.textDim,
-            onClick = function() SendPostDiscard(true) end,
+            onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+            onClick = function() SFXManager.Play("buttonPress"); SendPostDiscard(true) end,
         })
     elseif phase_ == "post_keep" then
         table.insert(buttons, UI.Button {
             text = "不保留，跳过",
             width = 140, height = 38, fontSize = 13,
             fontColor = Colors.textDim,
-            onClick = function() SendPostKeep(nil) end,
+            onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+            onClick = function() SFXManager.Play("buttonPress"); SendPostKeep(nil) end,
         })
     elseif phase_ == "round_end" then
         table.insert(buttons, UI.Button {
             text = "继续下一局",
             width = 130, height = 38, fontSize = 13,
             variant = "primary",
-            onClick = function() SendContinue() end,
+            onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+            onClick = function() SFXManager.Play("buttonPress"); SendContinue() end,
         })
     elseif phase_ == "game_over" then
         local winnerText = ""

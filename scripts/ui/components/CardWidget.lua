@@ -6,6 +6,7 @@
 local UI = require("urhox-libs/UI")
 local Card = require("core.Card")
 local Constant = require("core.Constant")
+local SFXManager = require("system.SFXManager")
 
 local CardWidget = {}
 
@@ -53,7 +54,7 @@ local function getCardEffectText(card)
     if rank == 9 then return "9: 结算时点数可视为0或9" end
     if rank == 10 then return "10(10点): 若弃置过此牌, 最终点数+1" end
     if rank == 11 then return "J(11点): 弃置时从弃牌堆抽牌; 结算前翻倍对方普通牌" end
-    if rank == 12 then return "Q(12点): 结算时使对方点数最小的牌变为0" end
+    if rank == 12 then return "Q(12点): 结算时使对方最小普通牌点数×3" end
     if rank == 13 then return "K: 对方点数向上取整, 己方点数-5后向下取整" end
     if rank >= 2 and rank <= 6 then
         return string.format("%d: 普通牌, %d点", rank, rank)
@@ -291,6 +292,7 @@ function CardWidget.Create(card, opts)
         -- 事件注册在 cardPanel 上（指针命中的是 cardPanel，Tooltip 包装后仍 dispatch）
         -- scale 设在 cardPanel（视觉放大），zIndex 设在 tooltipWrapper（在兄弟中提升层级）
         cardPanel:OnEvent("pointerenter", function()
+            SFXManager.Play("buttonFocus")
             cardPanel:SetStyle({ scale = 1.2 })
             tooltipWrapper:SetStyle({ zIndex = 100 })
         end)
@@ -305,6 +307,7 @@ function CardWidget.Create(card, opts)
     -- 无 Tooltip 的卡牌 (普通牌2~6无特效文字，或AI牌)
     if not isAI then
         cardPanel:OnEvent("pointerenter", function()
+            SFXManager.Play("buttonFocus")
             cardPanel:SetStyle({ scale = 1.2, zIndex = 100 })
         end)
         cardPanel:OnEvent("pointerleave", function()

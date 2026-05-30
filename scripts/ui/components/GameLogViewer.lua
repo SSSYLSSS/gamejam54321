@@ -6,6 +6,7 @@
 local UI = require("urhox-libs/UI")
 local Colors = require("ui.Colors")
 local GameController = require("service.GameController")
+local SFXManager = require("system.SFXManager")
 
 local GameLogViewer = {}
 
@@ -151,7 +152,9 @@ function GameLogViewer.Create(onClose)
                                 text = "关闭",
                                 fontSize = 12,
                                 height = 30,
+                                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                                 onClick = function()
+                                    SFXManager.Play("buttonPress")
                                     if onClose then onClose() end
                                 end,
                             },

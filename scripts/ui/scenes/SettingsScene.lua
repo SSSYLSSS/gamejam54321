@@ -4,11 +4,13 @@
 
 local UI = require("urhox-libs/UI")
 local Colors = require("ui.Colors")
+local SFXManager = require("system.SFXManager")
 
 local SettingsScene = {}
 
 --- 创建音量滑块
-local function CreateVolumeSlider(root, id, label, value, onChange)
+---@param getRoot fun():table 延迟获取 root 的函数
+local function CreateVolumeSlider(getRoot, id, label, value, onChange)
     return UI.Panel {
         width = "100%",
         gap = 6,
@@ -40,9 +42,12 @@ local function CreateVolumeSlider(root, id, label, value, onChange)
                 max = 100,
                 onChange = function(self, val)
                     local rounded = math.floor(val + 0.5)
-                    local valLabel = root:FindById("volumeVal_" .. id)
-                    if valLabel then
-                        valLabel:SetText(tostring(rounded) .. "%")
+                    local r = getRoot()
+                    if r then
+                        local valLabel = r:FindById("volumeVal_" .. id)
+                        if valLabel then
+                            valLabel:SetText(tostring(rounded) .. "%")
+                        end
                     end
                     if onChange then onChange(rounded) end
                 end,
@@ -56,18 +61,19 @@ end
 ---@param callbacks table {onAudioChange, onBack}
 ---@return table root
 function SettingsScene.Build(audioSettings, callbacks)
-    -- 需要提前声明 root 供 slider onChange 引用
+    -- 提前声明 root, 通过闭包延迟引用
     local root
+    local function getRoot() return root end
 
-    local masterSlider = CreateVolumeSlider(nil, "master", "主音量", audioSettings.master, function(val)
+    local masterSlider = CreateVolumeSlider(getRoot, "master", "主音量", audioSettings.master, function(val)
         audioSettings.master = val
         if callbacks.onAudioChange then callbacks.onAudioChange() end
     end)
-    local musicSlider = CreateVolumeSlider(nil, "music", "音乐", audioSettings.music, function(val)
+    local musicSlider = CreateVolumeSlider(getRoot, "music", "音乐", audioSettings.music, function(val)
         audioSettings.music = val
         if callbacks.onAudioChange then callbacks.onAudioChange() end
     end)
-    local sfxSlider = CreateVolumeSlider(nil, "sfx", "音效", audioSettings.sfx, function(val)
+    local sfxSlider = CreateVolumeSlider(getRoot, "sfx", "音效", audioSettings.sfx, function(val)
         audioSettings.sfx = val
         if callbacks.onAudioChange then callbacks.onAudioChange() end
     end)
@@ -128,15 +134,18 @@ function SettingsScene.Build(audioSettings, callbacks)
                         height = 44,
                         fontSize = 15,
                         borderRadius = 8,
-                        onClick = callbacks.onBack,
+                        onPointerEnter = function()
+                            SFXManager.Play("buttonFocus")
+                        end,
+                        onClick = function(self)
+                            SFXManager.Play("buttonPress")
+                            if callbacks.onBack then callbacks.onBack(self) end
+                        end,
                     },
                 }
             },
         }
     }
-
-    -- 修正 slider onChange 中的 root 引用
-    -- 注: 由于闭包捕获, root 赋值后 slider 内的 onChange 也能正确引用
 
     return root
 end

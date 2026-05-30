@@ -6,6 +6,7 @@
 local UI = require("urhox-libs/UI")
 local Colors = require("ui.Colors")
 local MatchHistory = require("system.MatchHistory")
+local SFXManager = require("system.SFXManager")
 
 local ReplayScene = {}
 
@@ -80,7 +81,9 @@ function ReplayScene.BuildList(onBack)
                 flexDirection = "row",
                 justifyContent = "space-between",
                 alignItems = "center",
+                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                 onClick = function()
+                    SFXManager.Play("buttonPress")
                     ReplayScene._showReplay(idx, onBack)
                 end,
                 children = {
@@ -152,7 +155,11 @@ function ReplayScene.BuildList(onBack)
                                 text = "返回",
                                 fontSize = 12,
                                 height = 30,
-                                onClick = onBack,
+                                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+                                onClick = function()
+                                    SFXManager.Play("buttonPress")
+                                    onBack()
+                                end,
                             },
                         }
                     },
@@ -350,7 +357,9 @@ function ReplayScene._showReplay(index, onBackToList)
                                 text = "返回列表",
                                 fontSize = 12,
                                 height = 30,
+                                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                                 onClick = function()
+                                    SFXManager.Play("buttonPress")
                                     -- 重建列表
                                     local listRoot = ReplayScene.BuildList(onBackToList)
                                     UI.SetRoot(listRoot)

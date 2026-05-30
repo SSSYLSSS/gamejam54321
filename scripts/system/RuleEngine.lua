@@ -1,7 +1,7 @@
 -- ============================================================================
 -- system/RuleEngine.lua - 规则引擎
 -- 负责点数计算、7规则判定、胜负判定
--- 新规则: 9(0或9) / 10(弃置过+1) / J(翻倍对方普通牌) / Q(对方最小变0) / K(+1)
+-- 新规则: 9(0或9) / 10(弃置过+1) / J(翻倍对方普通牌) / Q(对方最小普通牌×3) / K(+1)
 -- ============================================================================
 
 local Card = require("core.Card")
@@ -26,7 +26,7 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
         nineFlexSaved = 0,
         tenBonus = 0,
         jackDoubleEffect = false,
-        queenNullified = false,
+        queenTripled = false,
         kingBonus = 0,
         finalPoints = 0,
     }
@@ -41,9 +41,9 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
     end
 
     -- =======================================================================
-    -- 1. 对方 Q 效果: 使我方手牌中点数最小的一张牌变为 0
+    -- 1. 对方 Q 效果: 使我方手牌中点数最小的一张普通牌(2-6)点数×3
     -- =======================================================================
-    local queenNullifiedIdx = nil
+    local queenTripleIdx = nil
     local opponentQueenCount = 0
     for _, card in ipairs(opponentHand) do
         if card.rank == 12 then
@@ -51,13 +51,12 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
         end
     end
     if opponentQueenCount > 0 then
-        -- 找我方点数最小的非0牌(排除鬼牌、Q/K等本身就是0的)
+        -- 找我方点数最小的普通牌(2-6)
         local minPts = math.huge
         local minIdx = nil
         for i, card in ipairs(hand) do
-            local pts = Card.GetBasePoints(card)
-            -- 7不可被修改
-            if pts > 0 and card.rank ~= 7 then
+            if Card.IsNormal(card) then
+                local pts = Card.GetBasePoints(card)
                 if pts < minPts then
                     minPts = pts
                     minIdx = i
@@ -65,8 +64,9 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
             end
         end
         if minIdx then
-            queenNullifiedIdx = minIdx
-            details.queenNullified = true
+            queenTripleIdx = minIdx
+            details.queenTripled = true
+            details.queenTripleOriginal = minPts
         end
     end
 
@@ -99,36 +99,36 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
     for i, card in ipairs(hand) do
         local points = Card.GetBasePoints(card)
 
-        -- Q 效果: 被 nullify 的牌变为 0
-        if i == queenNullifiedIdx then
-            points = 0
-        else
-            -- 9 的灵活选择: 可视为0或9, 根据接近21最优化选择
-            -- (先按 9 计算, 后续再优化)
-            if card.rank == 9 then
-                -- 暂时保持原值, 后面做全局优化
-            end
+        -- 9 的灵活选择: 可视为0或9, 根据接近21最优化选择
+        -- (先按 9 计算, 后续再优化)
+        if card.rank == 9 then
+            -- 暂时保持原值, 后面做全局优化
+        end
 
-            -- 7 不可被改变点数, 跳过其他效果
-            if card.rank == 7 then
-                totalPoints = totalPoints + points
-                goto continue
-            end
+        -- 7 不可被改变点数, 跳过其他效果
+        if card.rank == 7 then
+            totalPoints = totalPoints + points
+            goto continue
+        end
 
-            -- J 翻倍效果: 对方弃置过 J, 我方普通牌(2-6)翻倍
-            if opponentJackDouble and Card.IsNormal(card) then
-                points = points * 2
-            end
+        -- Q 效果: 被对方Q影响的普通牌点数×3
+        if i == queenTripleIdx then
+            points = points * 3
+        end
 
-            -- Ace 翻倍效果
-            if card.suit and aceDoubledSuits[card.suit] then
-                points = points * 2
-            end
+        -- J 翻倍效果: 对方弃置过 J, 我方普通牌(2-6)翻倍
+        if opponentJackDouble and Card.IsNormal(card) then
+            points = points * 2
+        end
 
-            -- 8 效果: 自己的普通牌(2~6) 每张8降1点
-            if Card.IsNormal(card) and myEightCount > 0 then
-                points = math.max(0, points - myEightCount)
-            end
+        -- Ace 翻倍效果
+        if card.suit and aceDoubledSuits[card.suit] then
+            points = points * 2
+        end
+
+        -- 8 效果: 自己的普通牌(2~6) 每张8降1点
+        if Card.IsNormal(card) and myEightCount > 0 then
+            points = math.max(0, points - myEightCount)
         end
 
         totalPoints = totalPoints + points
@@ -140,7 +140,7 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
     -- =======================================================================
     if totalPoints > GameConfig.TARGET_POINTS then
         for i, card in ipairs(hand) do
-            if card.rank == 9 and i ~= queenNullifiedIdx then
+            if card.rank == 9 then
                 -- 当前 9 贡献了多少点? 重新计算
                 local nineContribution = 9
                 -- 应用可能的翻倍效果

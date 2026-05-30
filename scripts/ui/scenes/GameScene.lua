@@ -13,6 +13,8 @@ local AISystem = require("system.AISystem")
 local StatsSystem = require("system.StatsSystem")
 local SaveSystem = require("system.SaveSystem")
 local VFXManager = require("vfx.VFXManager")
+local SFXManager = require("system.SFXManager")
+local BGMManager = require("system.BGMManager")
 local GameLogViewer = require("ui.components.GameLogViewer")
 local MatchHistory = require("system.MatchHistory")
 
@@ -159,6 +161,13 @@ function GameScene.Update(dt)
         if anim.timer >= anim.interval then
             anim.timer = 0
             anim.revealedCount = anim.revealedCount + 1
+            -- 播放倒计时翻牌音效 (5!→4!→3!→2!→1!)
+            local remaining = #anim.aiHand - anim.revealedCount + 1
+            if remaining >= 1 and remaining <= 5 then
+                SFXManager.PlayCardFlipCountdown(remaining)
+            else
+                SFXManager.Play("flipCard")
+            end
             GameScene._UpdateSettlementOverlay()
         end
     else
@@ -166,6 +175,18 @@ function GameScene.Update(dt)
         if not anim.showedContinue then
             anim.showedContinue = true
             GameScene._ShowSettlementContinueBtn()
+        end
+        -- 延迟播放胜负音效
+        if anim.winLoseTimer and anim.winLoseTimer > 0 then
+            anim.winLoseTimer = anim.winLoseTimer - dt
+            if anim.winLoseTimer <= 0 then
+                anim.winLoseTimer = 0
+                if anim.result.winner == "player" then
+                    SFXManager.Play("win")
+                elseif anim.result.winner == "ai" then
+                    SFXManager.Play("lose")
+                end
+            end
         end
     end
 end
@@ -218,6 +239,7 @@ function GameScene._CreateTopBar()
                         text = "< 菜单",
                         fontSize = 12,
                         height = 30,
+                        onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                         onClick = function()
                             if sceneCallbacks.onBackToMenu then
                                 sceneCallbacks.onBackToMenu()
@@ -287,6 +309,7 @@ local function createStackVisual(id, bgColors, borderColors, iconText, iconColor
                 hoverBackgroundColor = bgColors[4] or bgColors[3],
                 borderRadius = 5, borderWidth = 1, borderColor = borderColors[3],
                 justifyContent = "center", alignItems = "center",
+                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                 onClick = onClick,
                 children = {
                     UI.Label { text = iconText, fontSize = 18, fontColor = iconColor },
@@ -489,12 +512,14 @@ function GameScene._CreateBottomBar()
                         id = "actionBtn",
                         text = "确认",
                         variant = "primary",
+                        onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                         onClick = function() GameScene._OnAction() end,
                     },
                     UI.Button {
                         id = "skipBtn",
                         text = "跳过",
                         visible = false,
+                        onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                         onClick = function() GameScene._OnSkip() end,
                     },
                 }
@@ -800,6 +825,7 @@ end
 -- ============================================================================
 
 function GameScene._OnAction()
+    SFXManager.Play("buttonPress")
     local phase = GameController.GetPhase()
 
     if phase == Constant.PHASE.GAME_OVER then
@@ -815,6 +841,10 @@ function GameScene._OnAction()
         if not success then
             GameScene.SetInfo(err or "操作失败")
             return
+        end
+        -- 弃牌音效
+        if #indices > 0 then
+            SFXManager.Play("discard")
         end
         -- 弃牌飞行动画: 从手牌区飞向右侧弃牌堆
         if #indices > 0 then
@@ -927,6 +957,7 @@ function GameScene._OnAction()
 end
 
 function GameScene._OnSkip()
+    SFXManager.Play("buttonPress")
     local phase = GameController.GetPhase()
 
     if phase == Constant.PHASE.DRAW_FIVE or
@@ -996,13 +1027,28 @@ end
 function GameScene._ShowSettlementResult(result)
     if not result then return end
 
+    -- 结算开始: 压低 BGM 音量
+    BGMManager.Duck(0.2)
+
     -- 启动逐张翻牌动画(包括三7特殊规则也走翻牌流程)
     local aiHand = GameController.GetAIHand()
     local playerHand = GameController.GetPlayerHand()
+
+    -- 计算玩家"裸分"(不含对方效果影响的基础得分)
+    local RuleEngine = require("system.RuleEngine")
+    local playerRawPts = 0
+    if not result.sevenRuleTriggered then
+        local emptyHand = {}
+        local gs = GameController.GetState()
+        playerRawPts, _ = RuleEngine.CalculatePoints(playerHand, emptyHand,
+            gs and gs.player or nil, nil)
+    end
+
     settlementAnim = {
         result = result,
         aiHand = aiHand,
         playerHand = playerHand,
+        playerRawPoints = playerRawPts,  -- 翻牌期间展示的裸分
         revealedCount = 0,
         timer = 0,
         interval = 1.0,  -- 每1.0秒翻一张
@@ -1053,7 +1099,8 @@ function GameScene._UpdateSettlementOverlay()
 
     -- 全部翻完后触发结算效果
     local anim = settlementAnim
-    if anim and anim.revealedCount >= #anim.aiHand then
+    if anim and anim.revealedCount >= #anim.aiHand and not anim.vfxTriggered then
+        anim.vfxTriggered = true
         local sw = graphics:GetWidth() / graphics:GetDPR()
         local sh = graphics:GetHeight() / graphics:GetDPR()
         local cx, cy = sw * 0.5, sh * 0.5
@@ -1062,6 +1109,8 @@ function GameScene._UpdateSettlementOverlay()
         elseif anim.result.winner == "ai" then
             VFXManager.EmitLoseParticles(cx, cy)
         end
+        -- 延迟1秒播放胜负音效(避免和翻牌音效撞上)
+        anim.winLoseTimer = 1.0
     end
 end
 
@@ -1108,9 +1157,10 @@ local function buildEffectDetails(hand, details, isPlayer)
     end
 
     -- Q 效果
-    if details.queenNullified then
+    if details.queenTripled then
+        local origPts = details.queenTripleOriginal or "?"
         table.insert(effects, UI.Label {
-            text = "被对方Q效果: 最小牌点数归0",
+            text = string.format("被对方Q效果: 最小普通牌点数×3 (%s→%s)", origPts, origPts * 3),
             fontSize = 11,
             fontColor = { 180, 80, 200, 255 },
         })
@@ -1155,8 +1205,15 @@ function GameScene._BuildSettlementContent()
     local revealed = anim.revealedCount
     local allRevealed = revealed >= #anim.aiHand
 
-    -- 计算当前已翻开牌的累计点数(简化: 用基础点数展示渐进效果)
-    local playerPts = anim.result.playerPoints  -- 玩家点数固定(全部可见)
+    -- 计算当前已翻开牌的累计点数
+    -- 玩家: 翻牌期间显示裸分(不含对方效果), 翻完后显示最终分
+    local playerPts
+    if allRevealed then
+        playerPts = anim.result.playerPoints
+    else
+        playerPts = anim.playerRawPoints or anim.result.playerPoints
+    end
+
     local aiPtsShown = 0
     if allRevealed then
         aiPtsShown = anim.result.aiPoints
@@ -1187,7 +1244,12 @@ function GameScene._BuildSettlementContent()
 
     -- 点数显示
     local aiPtsText = allRevealed and string.format("%d 点", aiPtsShown) or string.format("%d 点...", aiPtsShown)
-    local playerPtsText = string.format("%d 点", playerPts)
+    local playerPtsText
+    if allRevealed and anim.playerRawPoints and anim.playerRawPoints ~= anim.result.playerPoints then
+        playerPtsText = string.format("%d → %d 点", anim.playerRawPoints, anim.result.playerPoints)
+    else
+        playerPtsText = string.format("%d 点", playerPts)
+    end
 
     -- 距离21的描述
     local aiDistText = ""
@@ -1238,6 +1300,7 @@ function GameScene._BuildSettlementContent()
         table.insert(resultChildren, UI.Button {
             text = "继续",
             variant = "primary",
+            onPointerEnter = function() SFXManager.Play("buttonFocus") end,
             onClick = function()
                 GameScene._CloseSettlementAndAdvance()
             end,
@@ -1338,6 +1401,7 @@ function GameScene._ShowSettlementContinueBtn()
         borderRadius = 8,
         borderWidth = 1,
         borderColor = { Colors.accent[1], Colors.accent[2], Colors.accent[3], 120 },
+        onPointerEnter = function() SFXManager.Play("buttonFocus") end,
         onClick = function()
             GameScene._CloseSettlementAndAdvance()
         end,
@@ -1354,6 +1418,8 @@ end
 --- 关闭结算弹窗并自动推进到POST_DISCARD阶段(或直接结束游戏)
 function GameScene._CloseSettlementAndAdvance()
     GameScene._CloseSettlementOverlay()
+    -- 结算结束: 恢复 BGM 音量
+    BGMManager.Unduck()
     -- 比分已达胜利条件时跳过二!/一!直接结束
     if GameController.IsGameOver() then
         GameController.SkipToGameOver()
@@ -1490,6 +1556,7 @@ function GameScene._ShowPileView(pileType)
                                 text = "关闭",
                                 fontSize = 12,
                                 height = 30,
+                                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                                 onClick = function() GameScene._ClosePileView() end,
                             },
                         }
@@ -1588,6 +1655,7 @@ function GameScene._ShowJackPickUI()
                         backgroundColor = { 100, 45, 45, 220 },
                         borderRadius = 8,
                         disabled = playerDiscard == 0,
+                        onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                         onClick = function() GameScene._OnJackPick("discard") end,
                     },
                     UI.Button {
@@ -1598,6 +1666,7 @@ function GameScene._ShowJackPickUI()
                         backgroundColor = { 45, 45, 100, 220 },
                         borderRadius = 8,
                         disabled = playerDeck == 0,
+                        onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                         onClick = function() GameScene._OnJackPick("deck") end,
                     },
                 }
@@ -1661,6 +1730,7 @@ function GameScene._StartTransition(roundNum)
         roundNum = roundNum,
         scoreText = string.format("比分  %d : %d", pw, aw),
     }
+    SFXManager.Play("shuffle")
     GameScene._CreateTransitionOverlay()
 end
 
@@ -1722,6 +1792,13 @@ function GameScene._EndTransition()
     if uiRoot then
         local overlay = uiRoot:FindById("transitionOverlay")
         if overlay then overlay:Remove() end
+    end
+    -- 检查是否进入决赛局（任一方2分），通知切换BGM
+    local pw, aw = GameController.GetScore()
+    if (pw >= GameConfig.WINS_NEEDED - 1 or aw >= GameConfig.WINS_NEEDED - 1) then
+        if sceneCallbacks and sceneCallbacks.onLastRound then
+            sceneCallbacks.onLastRound()
+        end
     end
     -- 开始新回合
     GameController.StartNextRound()

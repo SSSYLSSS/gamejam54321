@@ -5,6 +5,7 @@
 local UI = require("urhox-libs/UI")
 local Colors = require("ui.Colors")
 local StatsSystem = require("system.StatsSystem")
+local SFXManager = require("system.SFXManager")
 
 local MenuScene = {}
 
@@ -23,7 +24,13 @@ local function CreateMenuButton(text, color, onClick)
         borderRadius = 8,
         borderWidth = 1,
         borderColor = { color[1], color[2], color[3], 80 },
-        onClick = onClick,
+        onPointerEnter = function()
+            SFXManager.Play("buttonFocus")
+        end,
+        onClick = function(self)
+            SFXManager.Play("buttonPress")
+            if onClick then onClick(self) end
+        end,
     }
 end
 
@@ -202,7 +209,13 @@ function MenuScene.BuildDifficultySelect(callbacks)
                         width = "100%",
                         height = 36,
                         fontSize = 13,
-                        onClick = callbacks.onBack,
+                        onPointerEnter = function()
+                            SFXManager.Play("buttonFocus")
+                        end,
+                        onClick = function(self)
+                            SFXManager.Play("buttonPress")
+                            if callbacks.onBack then callbacks.onBack(self) end
+                        end,
                     },
                 }
             },
@@ -254,7 +267,13 @@ function MenuScene.BuildMultiplayerWaiting(onBack)
                         text = "取消",
                         width = "100%",
                         height = 40,
-                        onClick = onBack,
+                        onPointerEnter = function()
+                            SFXManager.Play("buttonFocus")
+                        end,
+                        onClick = function(self)
+                            SFXManager.Play("buttonPress")
+                            if onBack then onBack(self) end
+                        end,
                     },
                 }
             },
@@ -344,7 +363,13 @@ function MenuScene.BuildStats(onBack)
                         width = "100%",
                         height = 36,
                         fontSize = 13,
-                        onClick = onBack,
+                        onPointerEnter = function()
+                            SFXManager.Play("buttonFocus")
+                        end,
+                        onClick = function(self)
+                            SFXManager.Play("buttonPress")
+                            if onBack then onBack(self) end
+                        end,
                     },
                 }
             },

@@ -19,6 +19,8 @@ local StatsSystem = require("system.StatsSystem")
 local SaveSystem = require("system.SaveSystem")
 local MatchHistory = require("system.MatchHistory")
 local ReplayScene = require("ui.scenes.ReplayScene")
+local BGMManager = require("system.BGMManager")
+local SFXManager = require("system.SFXManager")
 local GameState = require("model.GameState")
 local PlayerState = require("model.PlayerState")
 local RoundState = require("model.RoundState")
@@ -80,6 +82,7 @@ end
 local function ShowMenu()
     currentScene = "menu"
     VFXManager.ClearParticles()
+    BGMManager.Play("menu")
 
     local root = MenuScene.Build({
         hasSave = SaveSystem.HasSave(),
@@ -134,6 +137,7 @@ end
 function ShowGame(fromSave)
     currentScene = "game"
     VFXManager.ClearParticles()
+    BGMManager.Play("game")
 
     if fromSave then
         -- 从存档恢复
@@ -158,6 +162,9 @@ function ShowGame(fromSave)
         onBackToMenu = function()
             SaveCurrentGame()
             ShowMenu()
+        end,
+        onLastRound = function()
+            BGMManager.Play("lastRound")
         end,
     })
 
@@ -261,7 +268,9 @@ function ShowSettings()
     currentScene = "settings"
     local root = SettingsScene.Build(audioSettings, {
         onAudioChange = function()
-            -- 未来: 应用音量到引擎
+            audio:SetMasterGain(SOUND_MASTER, audioSettings.master / 100)
+            audio:SetMasterGain(SOUND_MUSIC, audioSettings.music / 100)
+            audio:SetMasterGain(SOUND_EFFECT, audioSettings.sfx / 100)
         end,
         onBack = function()
             ShowMenu()
@@ -295,10 +304,17 @@ function Start()
     -- 5. 加载对局历史
     MatchHistory.Load()
 
-    -- 6. 显示主菜单
+    -- 6. 初始化音频系统
+    audio:SetMasterGain(SOUND_MASTER, audioSettings.master / 100)
+    audio:SetMasterGain(SOUND_MUSIC, audioSettings.music / 100)
+    audio:SetMasterGain(SOUND_EFFECT, audioSettings.sfx / 100)
+    BGMManager.Init(scene_)
+    SFXManager.Init(scene_)
+
+    -- 7. 显示主菜单
     ShowMenu()
 
-    -- 7. 订阅事件
+    -- 8. 订阅事件
     SubscribeToEvent("Update", "HandleUpdate")
     SubscribeToEvent("KeyDown", "HandleKeyDown")
 end
@@ -317,6 +333,7 @@ end
 function HandleUpdate(eventType, eventData)
     local dt = eventData["TimeStep"]:GetFloat()
     VFXManager.Update(dt)
+    BGMManager.Update(dt)
     CardWidget.UpdateBreathing(dt)
     if currentScene == "game" then
         GameScene.Update(dt)

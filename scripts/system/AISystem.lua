@@ -261,7 +261,7 @@ local function calculateCardStrategicValue(card, hand, totalPoints)
         return score
     end
 
-    -- Q: 使对方最小牌变0，战略价值高
+    -- Q: 使对方最小普通牌点数×3，战略价值高
     if card.rank == 12 then
         score = score + 10
         return score
@@ -426,7 +426,7 @@ local function hardDecidePostGame(hand)
         elseif card.rank == 1 then
             score = 15  -- A翻倍效果
         elseif card.rank == 12 then
-            score = 13  -- Q使对方变0
+            score = 13  -- Q使对方最小普通牌×3
         elseif card.rank == 9 then
             score = 12  -- 9灵活(0或9)
         elseif card.rank == 8 then

@@ -4,6 +4,7 @@
 
 local UI = require("urhox-libs/UI")
 local Colors = require("ui.Colors")
+local SFXManager = require("system.SFXManager")
 
 local TutorialScene = {}
 
@@ -304,7 +305,9 @@ function TutorialScene.Build(onBack)
         width = 80,
         height = 34,
         fontSize = 13,
+        onPointerEnter = function() SFXManager.Play("buttonFocus") end,
         onClick = function()
+            SFXManager.Play("buttonPress")
             if currentPage > 1 then
                 currentPage = currentPage - 1
                 RefreshPage()
@@ -318,7 +321,9 @@ function TutorialScene.Build(onBack)
         height = 34,
         fontSize = 13,
         fontColor = Colors.accent,
+        onPointerEnter = function() SFXManager.Play("buttonFocus") end,
         onClick = function()
+            SFXManager.Play("buttonPress")
             if currentPage >= totalPages then
                 onBack()
             else
@@ -386,7 +391,9 @@ function TutorialScene.Build(onBack)
                                 height = 34,
                                 fontSize = 12,
                                 fontColor = Colors.textDim,
+                                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
                                 onClick = function()
+                                    SFXManager.Play("buttonPress")
                                     onBack()
                                 end,
                             },
