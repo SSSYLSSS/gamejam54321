@@ -150,6 +150,9 @@ function CardWidget.Create(card, opts)
             rankText = Constant.RANK_NAMES[card.rank] or "?"
         end
 
+        -- 检查是否有王设定的点数(jokerValue: 王自身, jokerOverride: 大王赋予其他牌)
+        local assignedPts = card.jokerOverride or (Card.IsJoker(card) and card.jokerValue) or nil
+
         cardContent = {
             UI.Label {
                 text = rankText,
@@ -164,6 +167,30 @@ function CardWidget.Create(card, opts)
                 textAlign = "center",
             },
         }
+
+        -- 右上角点数标记
+        if assignedPts then
+            table.insert(cardContent, UI.Panel {
+                position = "absolute",
+                top = 4,
+                right = 4,
+                width = isAI and 28 or 44,
+                height = isAI and 28 or 44,
+                backgroundColor = { 255, 200, 50, 230 },
+                borderRadius = isAI and 14 or 22,
+                justifyContent = "center",
+                alignItems = "center",
+                children = {
+                    UI.Label {
+                        text = tostring(assignedPts),
+                        fontSize = isAI and 16 or 26,
+                        fontColor = { 40, 40, 40, 255 },
+                        fontWeight = "bold",
+                        textAlign = "center",
+                    },
+                }
+            })
+        end
     end
 
     local cardPanel = UI.Button {

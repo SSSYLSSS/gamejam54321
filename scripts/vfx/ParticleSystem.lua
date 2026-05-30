@@ -8,6 +8,19 @@ local VFXConfig = require("vfx.VFXConfig")
 local ParticleSystem = {}
 ParticleSystem.__index = ParticleSystem
 
+-- 星星纹理资源路径
+local STAR_IMAGES = {
+    "pic/stars/Star1.png",
+    "pic/stars/Star2.png",
+    "pic/stars/Star3.png",
+    "pic/stars/Star4.png",
+    "pic/stars/Star5.png",
+}
+
+-- 已加载的 NanoVG 图片句柄 (全局共享)
+local starHandles = nil  -- {[1]=handle, [2]=handle, ...}
+local starHandlesCtx = nil  -- 记录加载时的 ctx，防止重复加载
+
 ---@class Particle
 ---@field x number
 ---@field y number
@@ -62,6 +75,13 @@ function ParticleSystem:Emit(x, y, count, opts)
             b = baseB * (0.5 + math.random() * 0.5),
             brightness = 1.4 + math.random() * 0.4,
         }
+        -- 40% 概率成为星星粒子
+        if math.random() < 0.4 then
+            p.starIdx = math.random(1, #STAR_IMAGES)
+            p.rotation = math.random() * math.pi * 2
+            p.rotSpeed = (math.random() - 0.5) * 4  -- 旋转速度
+            p.radius = p.radius * 3.6  -- 星星大尺寸
+        end
         table.insert(self.particles, p)
     end
 end
@@ -109,6 +129,13 @@ function ParticleSystem:EmitToward(fromX, fromY, toX, toY, count, opts)
             brightness = 1.4 + math.random() * 0.4,
             noGravity = true,  -- 向目标飞行不受重力
         }
+        -- 40% 概率成为星星粒子
+        if math.random() < 0.4 then
+            p.starIdx = math.random(1, #STAR_IMAGES)
+            p.rotation = math.random() * math.pi * 2
+            p.rotSpeed = (math.random() - 0.5) * 4
+            p.radius = p.radius * 3.6  -- 星星大尺寸
+        end
         table.insert(self.particles, p)
     end
 end
@@ -154,6 +181,10 @@ function ParticleSystem:Update(dt)
             if not p.noGravity then
                 p.vy = p.vy + gravity * dt
             end
+            -- 星星旋转更新
+            if p.rotation then
+                p.rotation = p.rotation + p.rotSpeed * dt
+            end
             -- 亮度随生命衰减
             local lifeRatio = p.life / p.maxLife
             p.brightness = 1.0 + (p.brightness - 1.0) * lifeRatio
@@ -162,9 +193,24 @@ function ParticleSystem:Update(dt)
     end
 end
 
+--- 确保星星图片已加载
+---@param ctx any NanoVG context
+local function ensureStarImages(ctx)
+    if starHandles and starHandlesCtx == ctx then return end
+    starHandles = {}
+    starHandlesCtx = ctx
+    for i, path in ipairs(STAR_IMAGES) do
+        -- NVG_IMAGE_NEAREST = 1<<5 = 32, 使用最近邻过滤保持像素清晰
+        local handle = nvgCreateImage(ctx, path, 32)
+        starHandles[i] = handle
+    end
+end
+
 --- 渲染所有粒子 (NanoVG)
 ---@param ctx any NanoVG context
 function ParticleSystem:Render(ctx)
+    ensureStarImages(ctx)
+
     for _, p in ipairs(self.particles) do
         local lifeRatio = p.life / p.maxLife
         -- alpha 在生命后30%才开始衰减，前70%保持满不透明
@@ -175,7 +221,7 @@ function ParticleSystem:Render(ctx)
         local hdrG = p.g * p.brightness
         local hdrB = p.b * p.brightness
 
-        -- Bloom glow (只在亮度>1时)
+        -- Bloom glow (只在亮度>1时，星星和圆形通用)
         if p.brightness > 1.0 then
             local maxR = radius * VFXConfig.BLOOM_SIZE * (1.0 + VFXConfig.BLOOM_OUTER_ALPHA * 3.0)
             local innerR = radius * VFXConfig.BLOOM_MID_ALPHA * 0.5
@@ -189,16 +235,30 @@ function ParticleSystem:Render(ctx)
             nvgFill(ctx)
         end
 
-        -- 核心圆
-        nvgBeginPath(ctx)
-        nvgCircle(ctx, p.x, p.y, radius)
-        nvgFillColor(ctx, nvgRGBAf(
-            math.min(1, hdrR),
-            math.min(1, hdrG),
-            math.min(1, hdrB),
-            alpha
-        ))
-        nvgFill(ctx)
+        -- 星星粒子：用图片渲染
+        if p.starIdx and starHandles and starHandles[p.starIdx] then
+            local size = radius * 2.5
+            nvgSave(ctx)
+            nvgTranslate(ctx, p.x, p.y)
+            nvgRotate(ctx, p.rotation or 0)
+            nvgBeginPath(ctx)
+            nvgRect(ctx, -size * 0.5, -size * 0.5, size, size)
+            local imgPaint = nvgImagePattern(ctx, -size * 0.5, -size * 0.5, size, size, 0, starHandles[p.starIdx], alpha)
+            nvgFillPaint(ctx, imgPaint)
+            nvgFill(ctx)
+            nvgRestore(ctx)
+        else
+            -- 普通圆形粒子
+            nvgBeginPath(ctx)
+            nvgCircle(ctx, p.x, p.y, radius)
+            nvgFillColor(ctx, nvgRGBAf(
+                math.min(1, hdrR),
+                math.min(1, hdrG),
+                math.min(1, hdrB),
+                alpha
+            ))
+            nvgFill(ctx)
+        end
     end
 end
 

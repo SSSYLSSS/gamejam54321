@@ -564,6 +564,9 @@ function GameScene._RefreshPhaseLabel()
 end
 
 function GameScene._RefreshPlayerHand()
+    -- 结算动画期间由 _UpdatePlayerHandInPlace 控制展示，不覆盖
+    if settlementAnim then return end
+
     local panel = uiRoot:FindById("playerHandPanel")
     if not panel then return end
 
@@ -621,6 +624,9 @@ function GameScene._RefreshPlayerHand()
 end
 
 function GameScene._RefreshAIHand()
+    -- 结算动画期间由 _UpdateAIHandInPlace 控制展示，不覆盖
+    if settlementAnim then return end
+
     local panel = uiRoot:FindById("aiHandPanel")
     if not panel then return end
 

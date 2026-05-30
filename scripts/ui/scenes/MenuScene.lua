@@ -86,6 +86,7 @@ function MenuScene.Build(callbacks)
             left = img.x,
             top = img.y,
             rotate = img.rotate,
+            pointerEvents = "none",
         }
         table.insert(titleWidgets, w)
     end
