@@ -288,13 +288,19 @@ function VFXManager.ClearLightBeams()
     lightBeams = {}
 end
 
---- 发射飘字 (从指定位置向上浮动并淡出)
+--- 发射飘字 (随机倾斜, 随机方向渐出)
 ---@param x number 中心X
 ---@param y number 起始Y
 ---@param text string 文字内容
 ---@param opts table|nil {r, g, b, duration, fontSize}
 function VFXManager.EmitFloatingText(x, y, text, opts)
     opts = opts or {}
+    -- 随机方向角度 (弧度)
+    local angle = (math.random() * 2 - 1) * math.pi * 0.4 + (-math.pi / 2)  -- 大致向上, 带随机偏移
+    local speed = 50 + math.random() * 30  -- 飘动速度
+    -- 随机倾斜角度 (-25° ~ +25°)
+    local tilt = (math.random() * 2 - 1) * 25
+
     table.insert(floatingTexts, {
         x = x, y = y,
         text = text,
@@ -304,6 +310,9 @@ function VFXManager.EmitFloatingText(x, y, text, opts)
         fontSize = opts.fontSize or 18,
         duration = opts.duration or 1.2,
         elapsed = 0,
+        dirX = math.cos(angle) * speed,
+        dirY = math.sin(angle) * speed,
+        tilt = tilt,
     })
 end
 
@@ -433,8 +442,9 @@ function HandleVFXRender(eventType, eventData)
         nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
         for _, ft in ipairs(floatingTexts) do
             local progress = ft.elapsed / ft.duration
-            -- 上浮距离
-            local offsetY = -40 * progress
+            -- 随机方向偏移
+            local offsetX = ft.dirX * progress
+            local offsetY = ft.dirY * progress
             -- 淡入淡出: 前15%快速亮起, 后40%淡出
             local alpha
             if progress < 0.15 then
@@ -447,13 +457,15 @@ function HandleVFXRender(eventType, eventData)
             alpha = math.max(0, math.min(1, alpha))
 
             nvgSave(vg)
-            nvgFontSize(vg, ft.fontSize)
+            nvgTranslate(vg, ft.x + offsetX, ft.y + offsetY)
+            nvgRotate(vg, ft.tilt * math.pi / 180)
+            nvgFontSize(vg, ft.fontSize * 3)
             -- 描边/阴影
             nvgFillColor(vg, nvgRGBAf(0, 0, 0, alpha * 0.6))
-            nvgText(vg, ft.x + 1, ft.y + offsetY + 1, ft.text)
+            nvgText(vg, 1.5, 1.5, ft.text)
             -- 正文
             nvgFillColor(vg, nvgRGBAf(ft.r, ft.g, ft.b, alpha))
-            nvgText(vg, ft.x, ft.y + offsetY, ft.text)
+            nvgText(vg, 0, 0, ft.text)
             nvgRestore(vg)
         end
     end
