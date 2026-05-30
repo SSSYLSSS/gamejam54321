@@ -60,6 +60,10 @@ end
 ---@param card table
 ---@return number
 function Card.GetBasePoints(card)
+    -- 大王效果覆盖: 任意牌可被设为指定点数
+    if card.jokerOverride ~= nil then
+        return card.jokerOverride
+    end
     if card.category == Constant.CATEGORY.JOKER then
         return card.jokerValue or 0
     end

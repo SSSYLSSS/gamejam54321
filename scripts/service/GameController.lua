@@ -269,9 +269,9 @@ end
 
 --- 玩家大王: 设置点数
 ---@param value number 0-13
-function GameController.PlayerSetBigJokerValue(value)
+function GameController.PlayerSetBigJokerValue(targetIdx, value)
     if not state then return end
-    EffectSystem.PlayerSetBigJokerValue(state, value)
+    EffectSystem.PlayerSetBigJokerValue(state, targetIdx, value)
 end
 
 --- 设置玩家小王点数(自动最优)

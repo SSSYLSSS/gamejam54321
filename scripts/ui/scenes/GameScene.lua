@@ -1134,47 +1134,34 @@ function GameScene._AfterSmallJokerChoice()
     end
 end
 
---- 大王选择UI: 让玩家选择点数(0-13)
+--- 大王选择UI: 第一步 - 选择要变更点数的手牌
 function GameScene._ShowBigJokerChoiceUI()
     if not uiRoot then return end
 
-    -- 计算推荐值(接近21的最优点数)
     local playerHand = GameController.GetPlayerHand()
-    local nonJokerPts = 0
-    for _, card in ipairs(playerHand) do
-        if not Card.IsJoker(card) then
-            nonJokerPts = nonJokerPts + Card.GetBasePoints(card)
-        end
-    end
-    local recommended = math.max(0, math.min(13, GameConfig.TARGET_POINTS - nonJokerPts))
 
-    -- 创建点数按钮行
-    local rows = {}
-    for row = 0, 1 do
-        local rowBtns = {}
-        local startVal = row * 7
-        local endVal = math.min(startVal + 6, 13)
-        for v = startVal, endVal do
-            local isRec = (v == recommended)
-            table.insert(rowBtns, UI.Button {
-                text = tostring(v),
-                width = 36,
-                height = 34,
-                fontSize = 13,
-                backgroundColor = isRec and { 60, 120, 60, 220 } or { 50, 50, 80, 220 },
-                borderRadius = 6,
-                borderWidth = isRec and 2 or 0,
-                borderColor = isRec and { 100, 255, 100, 200 } or nil,
-                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
-                onClick = function()
-                    SFXManager.Play("buttonPress")
-                    GameScene._OnBigJokerChoice(v)
-                end,
-            })
+    -- 创建手牌按钮(让玩家选择哪张牌要改点数)
+    local cardButtons = {}
+    for i, card in ipairs(playerHand) do
+        local cardName = Card.GetName(card)
+        local pts = Card.GetBasePoints(card)
+        local displayText = string.format("%s(%d点)", cardName, pts)
+        if Card.IsJoker(card) then
+            displayText = cardName
         end
-        table.insert(rows, UI.Panel {
-            flexDirection = "row", gap = 4, justifyContent = "center",
-            children = rowBtns,
+        table.insert(cardButtons, UI.Button {
+            text = displayText,
+            height = 36,
+            fontSize = 12,
+            paddingLeft = 10,
+            paddingRight = 10,
+            backgroundColor = { 50, 50, 80, 220 },
+            borderRadius = 6,
+            onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+            onClick = function()
+                SFXManager.Play("buttonPress")
+                GameScene._ShowBigJokerValueUI(i)
+            end,
         })
     end
 
@@ -1203,7 +1190,99 @@ function GameScene._ShowBigJokerChoiceUI()
                         fontColor = Colors.jokerPurple,
                     },
                     UI.Label {
-                        text = string.format("选择大王的点数 (推荐: %d)", recommended),
+                        text = "选择一张手牌, 将其点数变为0-13",
+                        fontSize = 13,
+                        fontColor = Colors.textDim,
+                        textAlign = "center",
+                    },
+                    UI.Panel {
+                        flexDirection = "row", gap = 6, flexWrap = "wrap", justifyContent = "center",
+                        children = cardButtons,
+                    },
+                }
+            },
+        }
+    }
+    uiRoot:AddChild(overlay)
+end
+
+--- 大王选择UI: 第二步 - 为选中的手牌选择目标点数(0-13)
+function GameScene._ShowBigJokerValueUI(targetIdx)
+    if not uiRoot then return end
+
+    -- 关闭第一步的UI
+    local overlay = uiRoot:FindById("jokerChoiceOverlay")
+    if overlay then overlay:Remove() end
+
+    local playerHand = GameController.GetPlayerHand()
+    local targetCard = playerHand[targetIdx]
+    local targetName = targetCard and Card.GetName(targetCard) or "?"
+
+    -- 计算推荐值(让总分接近21)
+    local otherPts = 0
+    for i, card in ipairs(playerHand) do
+        if i ~= targetIdx and not (card.rank == 15) then
+            otherPts = otherPts + Card.GetBasePoints(card)
+        end
+    end
+    local recommended = math.max(0, math.min(13, GameConfig.TARGET_POINTS - otherPts))
+
+    -- 创建点数按钮行
+    local rows = {}
+    for row = 0, 1 do
+        local rowBtns = {}
+        local startVal = row * 7
+        local endVal = math.min(startVal + 6, 13)
+        for v = startVal, endVal do
+            local isRec = (v == recommended)
+            table.insert(rowBtns, UI.Button {
+                text = tostring(v),
+                width = 36,
+                height = 34,
+                fontSize = 13,
+                backgroundColor = isRec and { 60, 120, 60, 220 } or { 50, 50, 80, 220 },
+                borderRadius = 6,
+                borderWidth = isRec and 2 or 0,
+                borderColor = isRec and { 100, 255, 100, 200 } or nil,
+                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+                onClick = function()
+                    SFXManager.Play("buttonPress")
+                    GameScene._OnBigJokerChoice(targetIdx, v)
+                end,
+            })
+        end
+        table.insert(rows, UI.Panel {
+            flexDirection = "row", gap = 4, justifyContent = "center",
+            children = rowBtns,
+        })
+    end
+
+    local overlay2 = UI.Panel {
+        id = "jokerChoiceOverlay",
+        width = "100%",
+        height = "100%",
+        position = "absolute",
+        backgroundColor = { 0, 0, 0, 200 },
+        justifyContent = "center",
+        alignItems = "center",
+        children = {
+            UI.Panel {
+                width = 300,
+                backgroundColor = Colors.menuCard,
+                borderRadius = 12,
+                borderWidth = 1,
+                borderColor = { 150, 80, 200, 150 },
+                padding = 20,
+                gap = 12,
+                alignItems = "center",
+                children = {
+                    UI.Label {
+                        text = "大王效果",
+                        fontSize = 18,
+                        fontColor = Colors.jokerPurple,
+                    },
+                    UI.Label {
+                        text = string.format("将 %s 的点数设为: (推荐: %d)", targetName, recommended),
                         fontSize = 13,
                         fontColor = Colors.textDim,
                         textAlign = "center",
@@ -1214,16 +1293,16 @@ function GameScene._ShowBigJokerChoiceUI()
             },
         }
     }
-    uiRoot:AddChild(overlay)
+    uiRoot:AddChild(overlay2)
 end
 
-function GameScene._OnBigJokerChoice(value)
+function GameScene._OnBigJokerChoice(targetIdx, value)
     -- 关闭选择UI
     local overlay = uiRoot:FindById("jokerChoiceOverlay")
     if overlay then overlay:Remove() end
 
-    -- 设置大王点数
-    GameController.PlayerSetBigJokerValue(value)
+    -- 设置目标牌的点数
+    GameController.PlayerSetBigJokerValue(targetIdx, value)
 
     -- 全部处理完, 进入结算
     local result = GameController.DoJokerAndSettle()
@@ -1470,14 +1549,24 @@ function GameScene._BuildSettlementContent()
         end
     end
 
-    -- 玩家手牌显示行(AI小王翻开前显示含被移除牌的版本)
-    local showHand = (anim.jokerRevealTriggered or not anim.aiSmallJokerIdx) and anim.playerHand or anim.displayPlayerHand
+    -- 玩家手牌显示行(始终显示displayPlayerHand,被移除的牌标记半透明)
+    local showHand = anim.displayPlayerHand or anim.playerHand
     local playerCardWidgets = {}
+    -- 找出被移除牌在displayPlayerHand中的位置(最后多出来的那张)
+    local removedIdx = nil
+    if anim.aiSmallJokerRemoved and #showHand > #anim.playerHand then
+        removedIdx = #showHand
+    end
     for i, card in ipairs(showHand) do
-        -- AI小王刚翻开时,标记被移除的那张牌(最后一张多出的牌)
-        local isRemoved = anim.jokerRevealTriggered and anim.aiSmallJokerRemoved and i == #showHand and #showHand > #anim.playerHand
-        if isRemoved then
-            -- 不显示已移除的牌(切换到playerHand后自然消失)
+        local isRemovedCard = (i == removedIdx)
+        if isRemovedCard and anim.jokerRevealTriggered then
+            -- AI小王已翻开: 显示半透明+删除线标记
+            local cardWidget = CardWidget.Create(card, { small = true, skipTooltip = true })
+            local wrapper = UI.Panel {
+                opacity = 0.35,
+                children = { cardWidget },
+            }
+            table.insert(playerCardWidgets, wrapper)
         else
             table.insert(playerCardWidgets, CardWidget.Create(card, { small = true }))
         end
@@ -1589,10 +1678,10 @@ function GameScene._BuildSettlementContent()
             children = playerCardWidgets,
         },
     }
-    -- AI小王效果提示(翻到小王时显示)
-    if anim.jokerRevealTriggered and anim.aiSmallJokerRemoved and not allRevealed then
+    -- AI小王效果提示(翻到小王后持续显示)
+    if anim.jokerRevealTriggered and anim.aiSmallJokerRemoved then
         table.insert(playerAreaChildren, UI.Label {
-            text = "对方小王效果: 移除了 " .. Card.GetName(anim.aiSmallJokerRemoved) .. "!",
+            text = "对方小王效果: 移除了 " .. Card.GetName(anim.aiSmallJokerRemoved),
             fontSize = 12,
             fontColor = { 255, 120, 120, 255 },
         })
