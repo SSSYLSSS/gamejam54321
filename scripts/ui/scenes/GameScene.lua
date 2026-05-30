@@ -1558,18 +1558,14 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
         end
     end
 
-    if #affectedIndices == 0 then return end
-
     -- 计算屏幕坐标 (基于布局估算)
     local sw = graphics:GetWidth() / graphics:GetDPR()
     local sh = graphics:GetHeight() / graphics:GetDPR()
 
     -- AI 牌位置估算: topBar(50) + aiArea上部约30 + 牌中心
-    -- AI 牌大小 120×168, gap=12, 居中排列
     local aiCardW = 120
     local aiCardH = 168
     local aiTotalW = aiCount * aiCardW + (aiCount - 1) * 12
-    -- 左侧deckPile=90, 右侧discardPile=90, padding=16
     local centerAreaLeft = 90
     local centerAreaW = sw - 180  -- 减去左右两侧
     local aiStartX = centerAreaLeft + (centerAreaW - aiTotalW) * 0.5
@@ -1578,21 +1574,57 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
     local srcX = aiStartX + (revealedIdx - 1) * (aiCardW + 12) + aiCardW * 0.5
     local srcY = aiY
 
-    -- 玩家牌位置估算: 从底部算起 bottomBar(60) + gap + label(13) + gap + 牌中心
+    -- 玩家牌位置估算
     local playerCardW = 216
     local playerCardH = 300
     local playerTotalW = playerCount * playerCardW + (playerCount - 1) * 12
     local playerStartX = centerAreaLeft + (centerAreaW - playerTotalW) * 0.5
-    -- 从底部: bottomBar(60) + playerArea (alignItems=center, gap=6): label(13) + gap + 手牌 + gap + pointsLabel(26)
     local playerY = sh - 60 - 6 - 13 - 6 - playerCardH * 0.5
 
-    for _, pIdx in ipairs(affectedIndices) do
-        local destX = playerStartX + (pIdx - 1) * (playerCardW + 12) + playerCardW * 0.5
-        local destY = playerY
-        VFXManager.EmitLightBeam(srcX, srcY, destX, destY, {
-            r = beamColor.r, g = beamColor.g, b = beamColor.b,
-            duration = 1.0,
-        })
+    -- 1) AI特殊牌 → 影响玩家牌 (从AI牌发射到玩家牌)
+    if #affectedIndices > 0 then
+        for _, pIdx in ipairs(affectedIndices) do
+            local destX = playerStartX + (pIdx - 1) * (playerCardW + 12) + playerCardW * 0.5
+            local destY = playerY
+            VFXManager.EmitLightBeam(srcX, srcY, destX, destY, {
+                r = beamColor.r, g = beamColor.g, b = beamColor.b,
+                duration = 1.0,
+            })
+        end
+    end
+
+    -- 2) 玩家特殊牌 → 影响该AI牌 (从玩家牌发射到AI牌)
+    local aiCard2 = aiCard  -- 被翻开的AI牌
+    for pIdx, pCard in ipairs(playerHand) do
+        local shouldBeam = false
+        local pBeamColor = { r = 0.3, g = 0.8, b = 1.0 }  -- 默认青色
+
+        if pCard.rank == 11 and Card.IsNormal(aiCard2) then
+            -- 玩家J影响AI普通牌
+            shouldBeam = true
+            pBeamColor = { r = 0.3, g = 0.5, b = 1.0 }
+        elseif pCard.rank == 12 and Card.IsNormal(aiCard2) then
+            -- 玩家Q影响AI最大普通牌(简化：翻开普通牌就发射)
+            shouldBeam = true
+            pBeamColor = { r = 0.5, g = 0.2, b = 1.0 }
+        elseif pCard.rank == 1 and aiCard2.suit and pCard.suit == aiCard2.suit then
+            -- 玩家A影响AI同花色的牌
+            shouldBeam = true
+            pBeamColor = { r = 0.2, g = 1.0, b = 0.5 }
+        elseif pCard.rank == 8 and Card.IsNormal(aiCard2) then
+            -- 玩家8影响AI普通牌
+            shouldBeam = true
+            pBeamColor = { r = 0.2, g = 0.9, b = 0.7 }
+        end
+
+        if shouldBeam then
+            local pSrcX = playerStartX + (pIdx - 1) * (playerCardW + 12) + playerCardW * 0.5
+            local pSrcY = playerY
+            VFXManager.EmitLightBeam(pSrcX, pSrcY, srcX, srcY, {
+                r = pBeamColor.r, g = pBeamColor.g, b = pBeamColor.b,
+                duration = 1.0,
+            })
+        end
     end
 end
 

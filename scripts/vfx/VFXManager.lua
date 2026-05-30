@@ -297,7 +297,7 @@ function HandleVFXRender(eventType, eventData)
         CardGlow.RenderAll(vg, cardGlowList, time)
     end
 
-    -- 层级2.5: 图片 Bloom 辉光 (BoxGradient 大范围模糊扩散)
+    -- 层级2.5: 图片辉光 (中心点光源 + 呼吸效果 + 旋转)
     if #bloomImages > 0 then
         for _, bi in ipairs(bloomImages) do
             nvgSave(vg)
@@ -308,25 +308,7 @@ function HandleVFXRender(eventType, eventData)
                 nvgRotate(vg, bi.rotate * math.pi / 180)
             end
 
-            local intensity = bi.intensity
-            local glowStrength = math.max(0, intensity - 1.0)
-
-            -- 大范围 BoxGradient 模糊光晕 (feather 值越大扩散越远)
-            local feather = math.max(bi.w, bi.h) * 0.6
-            local glowAlpha = 0.4 * glowStrength
-            nvgBeginPath(vg)
-            nvgRect(vg, -bi.w * 0.5 - feather * 1.5, -bi.h * 0.5 - feather * 1.5,
-                    bi.w + feather * 3, bi.h + feather * 3)
-            local grad = nvgBoxGradient(vg,
-                -bi.w * 0.5, -bi.h * 0.5, bi.w, bi.h,
-                bi.w * 0.15,  -- cornerRadius
-                feather,      -- feather (大范围扩散)
-                nvgRGBAf(1.0, 0.92, 0.75, glowAlpha),
-                nvgRGBAf(1.0, 0.8, 0.5, 0))
-            nvgFillPaint(vg, grad)
-            nvgFill(vg)
-
-            -- 原始图片
+            -- 原始图片先渲染
             nvgGlobalAlpha(vg, 1.0)
             local pat = nvgImagePattern(vg, -bi.w * 0.5, -bi.h * 0.5, bi.w, bi.h, 0, bi.handle, 1.0)
             nvgBeginPath(vg)
@@ -334,6 +316,42 @@ function HandleVFXRender(eventType, eventData)
             nvgFillPaint(vg, pat)
             nvgFill(vg)
 
+            -- 点光源: 呼吸 + 旋转
+            local intensity = bi.intensity
+            local glowStrength = math.max(0, intensity - 1.0)
+            -- 呼吸: sin波动 (周期约1.5s)
+            local breath = 0.6 + 0.4 * math.sin(time * 4.2)
+            local glowAlpha = 0.5 * glowStrength * breath
+            -- 旋转角度
+            local rotAngle = time * 1.8  -- 弧度/秒
+
+            nvgSave(vg)
+            nvgRotate(vg, rotAngle)
+
+            -- 径向光源: 用椭圆形RadialGradient模拟旋转光斑
+            local radius = math.max(bi.w, bi.h) * 0.45 * (0.8 + 0.2 * breath)
+            local radX = radius * 1.3  -- 椭圆长轴
+            local radY = radius * 0.7  -- 椭圆短轴
+
+            -- 外层大范围柔光
+            nvgBeginPath(vg)
+            nvgEllipse(vg, 0, 0, radX * 1.6, radY * 1.6)
+            local outerGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 1.2,
+                nvgRGBAf(1.0, 0.92, 0.7, glowAlpha * 0.4),
+                nvgRGBAf(1.0, 0.85, 0.5, 0))
+            nvgFillPaint(vg, outerGrad)
+            nvgFill(vg)
+
+            -- 核心亮点
+            nvgBeginPath(vg)
+            nvgEllipse(vg, 0, 0, radX, radY)
+            local coreGrad = nvgRadialGradient(vg, 0, 0, 0, radius * 0.5,
+                nvgRGBAf(1.0, 0.98, 0.9, glowAlpha * 0.9),
+                nvgRGBAf(1.0, 0.9, 0.6, 0))
+            nvgFillPaint(vg, coreGrad)
+            nvgFill(vg)
+
+            nvgRestore(vg)
             nvgRestore(vg)
         end
     end
