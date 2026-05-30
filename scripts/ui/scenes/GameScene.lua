@@ -1600,12 +1600,48 @@ local function buildEffectDetails(hand, details, isPlayer)
         })
     end
 
+    -- J 翻倍效果(被对方J翻倍)
+    if details.opponentJackCount and details.opponentJackCount > 0 then
+        table.insert(effects, UI.Label {
+            text = string.format("被对方J效果(%d张): 普通牌点数×%d", details.opponentJackCount, 2 ^ details.opponentJackCount),
+            fontSize = 11,
+            fontColor = { 200, 100, 255, 255 },
+        })
+    end
+
     -- 10 弃置加分
     if details.tenBonus and details.tenBonus > 0 then
         table.insert(effects, UI.Label {
             text = string.format("10弃置奖励: +%d点", details.tenBonus),
             fontSize = 11,
             fontColor = { 100, 200, 100, 255 },
+        })
+    end
+
+    -- 运算过程(逐张计算展示)
+    if details.cardBreakdown and #details.cardBreakdown > 0 then
+        local parts = {}
+        for _, entry in ipairs(details.cardBreakdown) do
+            if #entry.effects > 0 then
+                table.insert(parts, string.format("%s(%d→%d)", entry.name, entry.base, entry.final))
+            else
+                table.insert(parts, string.format("%s(%d)", entry.name, entry.final))
+            end
+        end
+        local sum = 0
+        for _, entry in ipairs(details.cardBreakdown) do
+            sum = sum + entry.final
+        end
+        local formulaText = table.concat(parts, " + ")
+        if details.tenBonus and details.tenBonus > 0 then
+            formulaText = formulaText .. string.format(" + 10奖励(%d)", details.tenBonus)
+            sum = sum + details.tenBonus
+        end
+        formulaText = formulaText .. " = " .. sum
+        table.insert(effects, UI.Label {
+            text = "计算: " .. formulaText,
+            fontSize = 10,
+            fontColor = { 180, 180, 180, 255 },
         })
     end
 

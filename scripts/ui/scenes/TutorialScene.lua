@@ -65,7 +65,7 @@ local PAGES = {
         title = "特殊牌效果(下)",
         icon = "⚡",
         content = {
-            { type = "card", rank = "J", desc = "弃置含J时, 所有补牌可逐张\n选择从弃牌堆或抽牌堆抽取" },
+            { type = "card", rank = "J", desc = "弃置含J时, 所有补牌可选来源;\n结算时手中有J则对方普通牌×2" },
             { type = "card", rank = "Q", desc = "使对方最大普通牌点数×2(可叠加)" },
             { type = "card", rank = "K", desc = "对方点数向上取整到十位\n己方-5后向下取整到十位" },
             { type = "gap" },
@@ -79,7 +79,7 @@ local PAGES = {
             { type = "text", value = "鬼牌在抽牌阶段结束后触发效果：" },
             { type = "gap" },
             { type = "card", rank = "小王", desc = "选择移除对方一张牌(看不到牌面)\n点数自动选择最优(0~13)" },
-            { type = "card", rank = "大王", desc = "选一张手牌设为任意点数\n大王自身也选任意点数(0~13)" },
+            { type = "card", rank = "大王", desc = "选一张手牌设为任意点数(仅当局)\n大王自身也选任意点数(0~13)" },
             { type = "gap" },
             { type = "text", value = "鬼牌效果触发后仍保留在手中，以选定点数计入总分。" },
         }

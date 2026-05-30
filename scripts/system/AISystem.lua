@@ -267,9 +267,16 @@ local function calculateCardStrategicValue(card, hand, totalPoints)
         return score
     end
 
-    -- J: 弃置可选择补牌来源(弃牌堆/抽牌堆)，留着不如弃掉
+    -- J: 双重效果 - 弃置可选择补牌来源; 留在手中则结算时对方普通牌×2
+    -- 策略: 如果留着J总点数接近21, 保留(翻倍对方); 否则弃置(利用选择补牌)
     if card.rank == 11 then
-        score = score - 2  -- 低保留价值，鼓励弃置
+        local totalWithJ = totalPoints
+        local totalWithoutJ = totalPoints - 11
+        if math.abs(totalWithJ - GameConfig.TARGET_POINTS) <= 5 then
+            score = score + 8  -- 留着J且接近21: 高保留价值(翻倍对方)
+        else
+            score = score - 2  -- 离21太远: 弃掉利用选择补牌效果
+        end
         return score
     end
 
@@ -338,12 +345,7 @@ local function hardDecideDiscard(hand, turnIndex)
 
     -- 如果已经很接近21, 考虑是否需要弃牌
     if math.abs(totalPoints - target) <= 1 then
-        -- 检查是否有J值得弃(利用弃置选择补牌来源效果)
-        for i, card in ipairs(hand) do
-            if card.rank == 11 then
-                return { i }  -- 弃J触发选择补牌来源
-            end
-        end
+        -- 接近21时: J留在手中更有价值(翻倍对方普通牌), 不要弃掉
         return {}
     end
 
@@ -372,8 +374,8 @@ local function hardDecideDiscard(hand, turnIndex)
             goto continue
         end
 
-        -- J: 优先弃(有弃置选择补牌来源效果)
-        if entry.card.rank == 11 then
+        -- J: 如果离21远则优先弃(选择补牌来源); 接近21则保留(翻倍对方)
+        if entry.card.rank == 11 and math.abs(totalPoints - removedPoints - target) > 5 then
             table.insert(discardIndices, entry.idx)
             removedPoints = removedPoints + pts
             goto continue
@@ -455,7 +457,7 @@ local function hardDecidePostGame(hand)
         if idx ~= bestKeepIdx then
             local card = hand[idx]
             local priority = 0
-            if card.rank == 11 then priority = 100 end  -- J最优先弃(触发选择补牌来源)
+            if card.rank == 11 then priority = 60 end   -- J弃置有选择补牌来源效果(但保留可翻倍对方)
             if card.rank == 10 then priority = 50 end   -- 10弃了+1
             table.insert(sortedIndices, { idx = idx, priority = priority })
         end

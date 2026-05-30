@@ -1,7 +1,7 @@
 -- ============================================================================
 -- system/RuleEngine.lua - 规则引擎
 -- 负责点数计算、7规则判定、胜负判定
--- 新规则: 9(0或9) / 10(弃置过+1) / J(弃置时选择补牌来源) / Q(对方最大普通牌×2) / K(+1)
+-- 新规则: 9(0或9) / 10(弃置过+1) / J(弃置选来源+结算翻倍) / Q(对方最大普通牌×2) / K(取整)
 -- ============================================================================
 
 local Card = require("core.Card")
@@ -28,11 +28,20 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
         queenTripled = false,
         kingBonus = 0,
         finalPoints = 0,
+        opponentJackCount = 0,
+        cardBreakdown = {},  -- 每张牌的计算过程 {name, base, effects={}, final}
     }
 
     -- =======================================================================
-    -- 0. J 效果: 仅弃置时选择补牌来源, 无结算效果(已移除翻倍)
+    -- 0. J 效果: 弃置时选择补牌来源 + 结算时手牌中有J则对方普通牌×2
     -- =======================================================================
+    local opponentJackCount = 0
+    for _, card in ipairs(opponentHand) do
+        if card.rank == 11 then
+            opponentJackCount = opponentJackCount + 1
+        end
+    end
+    details.opponentJackCount = opponentJackCount
 
     -- =======================================================================
     -- 1. 对方 Q 效果: 每张Q使我方手牌中点数最大的一张普通牌(2-6)点数×2
@@ -100,7 +109,9 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
     -- =======================================================================
     local totalPoints = 0
     for i, card in ipairs(hand) do
-        local points = Card.GetBasePoints(card)
+        local basePoints = Card.GetBasePoints(card)
+        local points = basePoints
+        local breakdown = { name = Card.GetName(card), base = basePoints, effects = {}, final = 0 }
 
         -- 9 的灵活选择: 可视为0或9, 根据接近21最优化选择
         -- (先按 9 计算, 后续再优化)
@@ -111,6 +122,8 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
         -- 7 不可被改变点数, 跳过其他效果
         if card.rank == 7 then
             totalPoints = totalPoints + points
+            breakdown.final = points
+            table.insert(details.cardBreakdown, breakdown)
             goto continue
         end
 
@@ -119,20 +132,31 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
             for _ = 1, queenDoubleMap[i] do
                 points = points * 2
             end
+            table.insert(breakdown.effects, string.format("Q×%d", queenDoubleMap[i]))
         end
 
-        -- (J 翻倍效果已移除, J仅影响弃置时补牌来源选择)
+        -- J 效果: 对方手牌中每有一张J, 己方普通牌(2~6)点数×2
+        if Card.IsNormal(card) and opponentJackCount > 0 then
+            for _ = 1, opponentJackCount do
+                points = points * 2
+            end
+            table.insert(breakdown.effects, string.format("J×%d", opponentJackCount))
+        end
 
         -- Ace 翻倍效果
         if card.suit and aceDoubledSuits[card.suit] then
             points = points * 2
+            table.insert(breakdown.effects, "A×2")
         end
 
         -- 8 效果: 自己的普通牌(2~6) 每张8降1点
         if Card.IsNormal(card) and myEightCount > 0 then
             points = math.max(0, points - myEightCount)
+            table.insert(breakdown.effects, string.format("8(-%d)", myEightCount))
         end
 
+        breakdown.final = points
+        table.insert(details.cardBreakdown, breakdown)
         totalPoints = totalPoints + points
         ::continue::
     end
@@ -154,6 +178,11 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
                 if math.abs(withoutNine - GameConfig.TARGET_POINTS) < math.abs(totalPoints - GameConfig.TARGET_POINTS) then
                     totalPoints = withoutNine
                     details.nineFlexSaved = details.nineFlexSaved + nineContribution
+                    -- 更新breakdown
+                    if details.cardBreakdown[i] then
+                        details.cardBreakdown[i].final = 0
+                        table.insert(details.cardBreakdown[i].effects, "灵活→0")
+                    end
                 end
             end
         end

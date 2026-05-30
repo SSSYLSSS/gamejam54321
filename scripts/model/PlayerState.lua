@@ -23,10 +23,25 @@ end
 
 --- 重置手牌(新一局)
 function PlayerState:ResetHand()
+    -- 清除所有牌上的大王改值效果(仅单局生效)
+    self:ClearJokerOverrides()
     self.hand = {}
     self.pendingJackPicks = 0
     self.discardedTenCount = 0
     self.discardedJackCount = 0
+end
+
+--- 清除所有牌上的 jokerOverride(大王改值效果仅当局有效)
+function PlayerState:ClearJokerOverrides()
+    for _, card in ipairs(self.hand) do
+        card.jokerOverride = nil
+    end
+    for _, card in ipairs(self.deck) do
+        card.jokerOverride = nil
+    end
+    for _, card in ipairs(self.discardPile) do
+        card.jokerOverride = nil
+    end
 end
 
 --- 添加牌到手中

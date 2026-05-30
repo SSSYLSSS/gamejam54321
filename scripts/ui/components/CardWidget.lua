@@ -44,7 +44,7 @@ local function getCardEffectText(card)
         if card.rank == 14 then
             return "小王: 点数可选0~13, 移除对方一张牌"
         else
-            return "大王: 选一张手牌设为任意点数, 大王自身也选任意点数"
+            return "大王: 选一张手牌设为任意点数(仅当局有效), 大王自身也选任意点数"
         end
     end
     local rank = card.rank
@@ -53,7 +53,7 @@ local function getCardEffectText(card)
     if rank == 8 then return "8: 使自己普通牌(2~6)点数各减1(可叠加)" end
     if rank == 9 then return "9: 结算时点数可视为0或9" end
     if rank == 10 then return "10(10点): 若弃置过此牌, 最终点数+1" end
-    if rank == 11 then return "J(11点): 弃置含J时, 所有补牌可逐张选择从弃牌堆或抽牌堆抽取" end
+    if rank == 11 then return "J(11点): 弃置含J时, 所有补牌可逐张选择来源; 结算时手中有J则对方普通牌×2" end
     if rank == 12 then return "Q(12点): 结算时使对方最大普通牌点数×2(可叠加)" end
     if rank == 13 then return "K: 对方点数向上取整到十位, 己方-5后向下取整到十位" end
     if rank >= 2 and rank <= 6 then
