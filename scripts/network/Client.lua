@@ -39,6 +39,11 @@ local p2Wins_ = 0
 local phase_ = "connecting"  -- connecting, waiting_opponent, turn, waiting_resolve, settlement, post_discard, post_keep, round_end, game_over, disconnected
 local infoText_ = "连接中..."
 
+-- 弃牌堆数据
+local myDiscardPile_ = {}    -- 自己的弃牌堆
+local oppDiscardPile_ = {}   -- 对方的弃牌堆
+local viewingPile_ = nil     -- 当前查看的牌堆 ("my"|"opp"|nil)
+
 ---@type table|nil
 local uiRoot_ = nil
 
@@ -82,15 +87,32 @@ local function RefreshUI()
         }
     })
 
-    -- 对手信息
+    -- 对手信息 + 弃牌堆按钮
     table.insert(children, UI.Panel {
         width = "100%", height = 36,
-        justifyContent = "center", alignItems = "center",
+        flexDirection = "row", justifyContent = "space-between", alignItems = "center",
+        paddingLeft = 12, paddingRight = 12,
         backgroundColor = { 30, 20, 20, 120 },
         children = {
+            UI.Button {
+                text = string.format("对方弃牌(%d)", #oppDiscardPile_),
+                fontSize = 11, height = 26, paddingHorizontal = 8,
+                fontColor = { 255, 140, 80, 220 },
+                backgroundColor = { 60, 35, 35, 180 },
+                borderRadius = 4,
+                onClick = function() ShowDiscardPileView("opp") end,
+            },
             UI.Label {
                 text = string.format("对手手牌: %d 张", opponentHandSize_),
                 fontSize = 12, fontColor = { 255, 140, 80, 200 },
+            },
+            UI.Button {
+                text = string.format("我的弃牌(%d)", #myDiscardPile_),
+                fontSize = 11, height = 26, paddingHorizontal = 8,
+                fontColor = { 150, 200, 150, 220 },
+                backgroundColor = { 30, 50, 35, 180 },
+                borderRadius = 4,
+                onClick = function() ShowDiscardPileView("my") end,
             },
         }
     })
@@ -248,6 +270,134 @@ function SelectKeepCard(index)
     SendPostKeep(index)
 end
 
+-- ============================================================================
+-- 弃牌堆查看
+-- ============================================================================
+
+function ShowDiscardPileView(pileType)
+    viewingPile_ = pileType
+    local pile, title
+    if pileType == "my" then
+        pile = myDiscardPile_
+        title = "我的弃牌堆"
+    else
+        pile = oppDiscardPile_
+        title = "对方弃牌堆"
+    end
+
+    -- 按 rank 分组显示
+    local groups = {}
+    local groupMap = {}
+    for _, card in ipairs(pile) do
+        local r = card.rank
+        if not groupMap[r] then
+            groupMap[r] = { rank = r, cards = {} }
+            table.insert(groups, groupMap[r])
+        end
+        table.insert(groupMap[r].cards, card)
+    end
+    table.sort(groups, function(a, b) return a.rank < b.rank end)
+
+    local rowWidgets = {}
+    if #pile == 0 then
+        table.insert(rowWidgets, UI.Label {
+            text = "（空）",
+            fontSize = 14,
+            fontColor = Colors.textDim,
+        })
+    else
+        for _, group in ipairs(groups) do
+            local cardRow = {}
+            for _, card in ipairs(group.cards) do
+                table.insert(cardRow, CardWidget.Create(card, { small = true }))
+            end
+            table.insert(rowWidgets, UI.Panel {
+                width = "100%",
+                flexDirection = "row",
+                gap = 6,
+                paddingHorizontal = 8,
+                paddingVertical = 4,
+                alignItems = "center",
+                children = cardRow,
+            })
+        end
+    end
+
+    local overlay = UI.Panel {
+        id = "discardPileOverlay",
+        width = "100%",
+        height = "100%",
+        position = "absolute",
+        backgroundColor = { 0, 0, 0, 180 },
+        justifyContent = "center",
+        alignItems = "center",
+        children = {
+            UI.Panel {
+                width = "85%",
+                maxHeight = "75%",
+                backgroundColor = { 25, 32, 50, 250 },
+                borderRadius = 12,
+                borderWidth = 1,
+                borderColor = { 80, 90, 120, 200 },
+                padding = 20,
+                gap = 12,
+                alignItems = "center",
+                children = {
+                    UI.Panel {
+                        width = "100%",
+                        flexDirection = "row",
+                        justifyContent = "space-between",
+                        alignItems = "center",
+                        children = {
+                            UI.Label {
+                                text = title .. string.format(" (%d张)", #pile),
+                                fontSize = 16,
+                                fontColor = Colors.gold,
+                            },
+                            UI.Button {
+                                text = "关闭",
+                                fontSize = 12,
+                                height = 30,
+                                onClick = function() CloseDiscardPileView() end,
+                            },
+                        }
+                    },
+                    UI.Panel {
+                        width = "100%",
+                        height = 1,
+                        backgroundColor = { 80, 90, 120, 150 },
+                    },
+                    UI.ScrollView {
+                        width = "100%",
+                        flexGrow = 1,
+                        flexBasis = 0,
+                        children = {
+                            UI.Panel {
+                                width = "100%",
+                                gap = 2,
+                                padding = 4,
+                                children = rowWidgets,
+                            }
+                        }
+                    },
+                }
+            },
+        }
+    }
+
+    uiRoot_:AddChild(overlay)
+end
+
+function CloseDiscardPileView()
+    viewingPile_ = nil
+    local overlay = uiRoot_:FindById("discardPileOverlay")
+    if overlay then overlay:Remove() end
+end
+
+-- ============================================================================
+-- 网络发送
+-- ============================================================================
+
 function SendDiscard()
     if #selectedIndices_ == 0 then return end
     local data = VariantMap()
@@ -321,6 +471,10 @@ local function OnRoundStart(eventType, eventData)
     myHand_ = Shared.DecodeHand(eventData, "Hand")
     selectedIndices_ = {}
 
+    -- 解码弃牌堆
+    myDiscardPile_ = Shared.DecodeHand(eventData, "MyDiscard")
+    oppDiscardPile_ = Shared.DecodeHand(eventData, "OppDiscard")
+
     infoText_ = string.format("第 %d 局开始!", roundNumber_)
     print(string.format("[Client] Round %d started, hand size: %d", roundNumber_, #myHand_))
     RefreshUI()
@@ -348,6 +502,10 @@ local function OnTurnResult(eventType, eventData)
     local oppDiscardCount = eventData["OppDiscardCount"]:GetInt()
     opponentHandSize_ = eventData["OppHandSize"]:GetInt()
     selectedIndices_ = {}
+
+    -- 解码弃牌堆
+    myDiscardPile_ = Shared.DecodeHand(eventData, "MyDiscard")
+    oppDiscardPile_ = Shared.DecodeHand(eventData, "OppDiscard")
 
     infoText_ = string.format("对手弃置了%d张牌", oppDiscardCount)
     RefreshUI()

@@ -383,7 +383,7 @@ function GameScene._CreateDiscardPile()
         alignItems = "center",
         paddingVertical = 12,
         children = {
-            -- AI 弃牌堆（不可查看内容）
+            -- AI 弃牌堆（可查看内容）
             UI.Panel {
                 alignItems = "center", gap = 3,
                 children = {
@@ -392,7 +392,7 @@ function GameScene._CreateDiscardPile()
                         { {55,35,35,180}, {68,42,42,200}, {80,48,48,255}, {105,60,60,255} },
                         { {80,50,50,150}, {95,60,60,180}, {115,70,70,200} },
                         "X", {160,100,100,255},
-                        function() GameScene._ShowPileInfo("aiDiscard") end
+                        function() GameScene._ShowPileView("aiDiscard") end
                     ),
                     UI.Label { id = "aiDiscardCountLabel", text = "0", fontSize = 10, fontColor = Colors.textDim },
                 }
@@ -2286,6 +2286,9 @@ function GameScene._ShowPileView(pileType)
     elseif pileType == "playerDeck" then
         pile = GameController.GetPlayerDeck()
         title = "我的抽牌堆"
+    elseif pileType == "aiDiscard" then
+        pile = GameController.GetAIDiscardPile()
+        title = "AI 弃牌堆"
     else
         return
     end

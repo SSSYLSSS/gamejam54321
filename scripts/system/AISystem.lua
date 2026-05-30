@@ -303,13 +303,10 @@ local function calculateCardStrategicValue(card, hand, totalPoints)
         return score
     end
 
-    -- 10: 弃置后+1，根据点数差距决定
+    -- 10: 留在手中会让对方点数+对方非普通牌数×2，对方点数越高越容易爆
+    -- 保留10等于帮对方加分(推对方爆21), 保留价值极高
     if card.rank == 10 then
-        if distance >= 0 then
-            score = score - 1  -- 点数够了，10本身0点但弃置有+1
-        else
-            score = score + 2
-        end
+        score = score + 6  -- 保留10能推高对方点数,战略价值高
         return score
     end
 
@@ -444,7 +441,7 @@ local function hardDecidePostGame(hand)
         elseif card.rank == 11 then
             score = 4   -- J弃了更好
         elseif card.rank == 10 then
-            score = 3   -- 10弃了+1
+            score = 8   -- 10留手中帮对方加分(推对方爆21),保留价值极高
         else
             -- 普通牌: 4-5点最佳(中间值)
             local pts = Card.GetBasePoints(card)
@@ -464,7 +461,7 @@ local function hardDecidePostGame(hand)
             local card = hand[idx]
             local priority = 0
             if card.rank == 11 then priority = 60 end   -- J弃置有选择补牌来源效果(但保留可翻倍对方)
-            if card.rank == 10 then priority = 50 end   -- 10弃了+1
+            if card.rank == 10 then priority = -10 end  -- 10留手中能推高对方点数,尽量不弃
             table.insert(sortedIndices, { idx = idx, priority = priority })
         end
     end

@@ -60,20 +60,29 @@ function MenuScene.Build(callbacks)
     table.insert(buttons, CreateMenuButton("退出游戏", Colors.danger, callbacks.onExit))
 
     -- 标题图片(五 四 三 21) - 居中散列 + 浮动动画
-    local smallSize = 300   -- 200 * 1.5
-    local bigSize = 500
+    -- 根据屏幕高度动态缩放，避免小屏幕下遮挡按钮
+    local sw = graphics:GetWidth() / graphics:GetDPR()
+    local sh = graphics:GetHeight() / graphics:GetDPR()
+    -- 菜单卡片约占 550px 高度 + 5%底部边距，标题只能用剩余空间
+    local availableTop = sh - 550 - sh * 0.05
+    -- 以 21 图片为约束：它从 y=11% 开始，需要在 availableTop 内放下
+    local maxBigSize = math.max(150, availableTop - sh * 0.11)
+    local titleScale = math.min(1.0, maxBigSize / 500)
+    titleScale = math.max(0.3, titleScale)
+    local smallSize = math.floor(300 * titleScale)
+    local bigSize = math.floor(500 * titleScale)
+    local bigTopPercent = math.floor(11 * titleScale)
     -- 五四三居中散列: 中心点分别在 30%, 50%, 70% 宽度
     -- 四在正中(50%), 五在左(30%), 三在右(70%)
     -- 21居中在四下方(中心点50%)
-    -- left = 中心百分比 - 半宽/屏幕宽(按844px逻辑宽估算)
-    local sw = graphics:GetWidth() / graphics:GetDPR()
+    -- left = 中心百分比 - 半宽/屏幕宽
     local halfSmall = smallSize * 0.5
     local halfBig = bigSize * 0.5
     local titleImages = {
         { src = "pic/五.png", size = smallSize, x = tostring(math.floor((0.30 * sw - halfSmall) / sw * 100)) .. "%", y = "0%",  rotate = -12 },
         { src = "pic/四.png", size = smallSize, x = tostring(math.floor((0.50 * sw - halfSmall) / sw * 100)) .. "%", y = "0%",  rotate = 0 },
         { src = "pic/三.png", size = smallSize, x = tostring(math.floor((0.70 * sw - halfSmall) / sw * 100)) .. "%", y = "0%",  rotate = 10 },
-        { src = "pic/21.png", size = bigSize,   x = tostring(math.floor((0.50 * sw - halfBig) / sw * 100)) .. "%",   y = "11%", rotate = -3 },
+        { src = "pic/21.png", size = bigSize,   x = tostring(math.floor((0.50 * sw - halfBig) / sw * 100)) .. "%",   y = tostring(bigTopPercent) .. "%", rotate = -3 },
     }
     local titleWidgets = {}
     for i, img in ipairs(titleImages) do
@@ -265,6 +274,44 @@ function MenuScene.BuildDifficultySelect(callbacks)
                             if callbacks.onBack then callbacks.onBack(self) end
                         end,
                     },
+                }
+            },
+        }
+    }
+end
+
+--- 构建多人游戏房间选择 UI
+---@param callbacks table {onCreateRoom, onJoinRoom, onBack}
+---@return table root
+function MenuScene.BuildMultiplayerMenu(callbacks)
+    return UI.Panel {
+        id = "root",
+        width = "100%",
+        height = "100%",
+        backgroundColor = Colors.menuBg,
+        justifyContent = "center",
+        alignItems = "center",
+        children = {
+            UI.Panel {
+                width = 320,
+                backgroundColor = Colors.menuCard,
+                borderRadius = 16,
+                borderWidth = 1,
+                borderColor = Colors.menuBorder,
+                padding = 32,
+                gap = 16,
+                alignItems = "center",
+                children = {
+                    UI.Label {
+                        text = "多人游戏",
+                        fontSize = 20,
+                        fontColor = Colors.gold,
+                    },
+                    UI.Panel { width = "80%", height = 1, backgroundColor = Colors.menuBorder, marginVertical = 4 },
+                    CreateMenuButton("创建房间", Colors.accent, callbacks.onCreateRoom),
+                    CreateMenuButton("加入房间", { 130, 200, 180, 255 }, callbacks.onJoinRoom),
+                    UI.Panel { height = 8 },
+                    CreateMenuButton("返回菜单", Colors.textDim, callbacks.onBack),
                 }
             },
         }

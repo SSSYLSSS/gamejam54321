@@ -21,7 +21,7 @@ local function serializePlayerState(playerState)
         discardPile = playerState.discardPile,
         keepCard = playerState.keepCard,
         pendingJackPicks = playerState.pendingJackPicks,
-        discardedTenCount = playerState.discardedTenCount,
+
         discardedJackCount = playerState.discardedJackCount,
     }
 end
@@ -125,7 +125,7 @@ function SaveSystem.RestoreGameState(saveData, GameState, PlayerState, RoundStat
         gs.player.discardPile = saveData.player.discardPile or {}
         gs.player.keepCard = saveData.player.keepCard
         gs.player.pendingJackPicks = saveData.player.pendingJackPicks or 0
-        gs.player.discardedTenCount = saveData.player.discardedTenCount or 0
+
         gs.player.discardedJackCount = saveData.player.discardedJackCount or 0
     end
 
@@ -136,7 +136,7 @@ function SaveSystem.RestoreGameState(saveData, GameState, PlayerState, RoundStat
         gs.ai.discardPile = saveData.ai.discardPile or {}
         gs.ai.keepCard = saveData.ai.keepCard
         gs.ai.pendingJackPicks = saveData.ai.pendingJackPicks or 0
-        gs.ai.discardedTenCount = saveData.ai.discardedTenCount or 0
+
         gs.ai.discardedJackCount = saveData.ai.discardedJackCount or 0
     end
 

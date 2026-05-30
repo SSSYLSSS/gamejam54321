@@ -195,6 +195,23 @@ function ShowMultiplayer()
     currentScene = "multiplayer"
     VFXManager.ClearBloomImages()
 
+    -- 显示房间选择界面(创建/加入)
+    local root = MenuScene.BuildMultiplayerMenu({
+        onCreateRoom = function()
+            StartMultiplayerMatch()
+        end,
+        onJoinRoom = function()
+            StartMultiplayerMatch()
+        end,
+        onBack = function()
+            ShowMenu()
+        end,
+    })
+    UI.SetRoot(root)
+end
+
+--- 开始多人匹配流程
+function StartMultiplayerMatch()
     -- 检查是否有可用的服务器连接 (background_match 模式)
     local hasConnection = false
     if network and network.GetServerConnection then

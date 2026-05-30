@@ -139,6 +139,9 @@ StartNewRound = function()
         data["P2Wins"] = Variant(gameState_.p2Wins)
         data["OpponentHandSize"] = Variant(#opp.state.hand)
         Shared.EncodeHand(data, "Hand", p.state.hand)
+        -- 双方弃牌堆完整内容(可互相查看)
+        Shared.EncodeHand(data, "MyDiscard", p.state.discardPile)
+        Shared.EncodeHand(data, "OppDiscard", opp.state.discardPile)
         SendToPlayer(i, Shared.EVENTS.ROUND_START, data)
     end
 
@@ -197,9 +200,7 @@ local function ProcessPlayerDiscard(playerId, discardIndices)
             if card.rank == 11 then
                 jackCount = jackCount + 1
             end
-            if card.rank == 10 then
-                playerState.discardedTenCount = playerState.discardedTenCount + 1
-            end
+
         end
     end
 
@@ -274,13 +275,16 @@ ResolveTurn = function()
         -- 自己的弃牌信息
         data["MyDiscardCount"] = Variant(#myResult.discarded)
         data["MyJackCount"] = Variant(myResult.jackCount)
-        -- 对手弃牌数(不暴露具体牌)
+        -- 对手弃牌数
         data["OppDiscardCount"] = Variant(#oppResult.discarded)
         data["OppJackCount"] = Variant(oppResult.jackCount)
         data["OppHandSize"] = Variant(#opp.state.hand)
         -- 牌堆信息
         data["DeckCount"] = Variant(#p.state.deck)
         data["DiscardPileCount"] = Variant(p.state:GetDiscardCount())
+        -- 双方弃牌堆完整内容(可互相查看)
+        Shared.EncodeHand(data, "MyDiscard", p.state.discardPile)
+        Shared.EncodeHand(data, "OppDiscard", opp.state.discardPile)
 
         SendToPlayer(i, Shared.EVENTS.TURN_RESULT, data)
     end

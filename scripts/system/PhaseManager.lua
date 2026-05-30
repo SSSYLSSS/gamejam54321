@@ -101,10 +101,6 @@ function PhaseManager.PlayerDiscard(gameState, discardIndices)
             if card.rank == 11 then
                 jackCount = jackCount + 1
             end
-            -- 追踪弃置的10和J
-            if card.rank == 10 then
-                player.discardedTenCount = player.discardedTenCount + 1
-            end
         end
     end
 
@@ -173,10 +169,6 @@ function PhaseManager.AITurn(gameState)
             table.insert(discarded, card)
             if card.rank == 11 then
                 jackCount = jackCount + 1
-            end
-            -- 追踪弃置的10和J
-            if card.rank == 10 then
-                ai.discardedTenCount = ai.discardedTenCount + 1
             end
         end
     end

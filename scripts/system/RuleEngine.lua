@@ -1,7 +1,7 @@
 -- ============================================================================
 -- system/RuleEngine.lua - 规则引擎
 -- 负责点数计算、7规则判定、胜负判定
--- 新规则: 9(0或9) / 10(弃置过+1) / J(弃置选来源+结算翻倍) / Q(对方最大普通牌×2) / K(取整) / 8(己方普通牌-1,对方普通牌+2)
+-- 新规则: 9(0或9) / 10(对方10使己方+非普通牌数×2) / J(弃置选来源+结算翻倍) / Q(对方最大普通牌×2) / K(取整) / 8(己方普通牌-1,对方普通牌+2)
 -- ============================================================================
 
 local Card = require("core.Card")
@@ -13,7 +13,7 @@ local RuleEngine = {}
 --- 计算一手牌的最终点数(含特效)
 --- @param hand table[] 自己的手牌
 --- @param opponentHand table[] 对手的手牌
---- @param playerState table|nil PlayerState (用于读取 discardedTenCount/discardedJackCount)
+--- @param playerState table|nil PlayerState (用于读取 discardedJackCount)
 --- @param opponentState table|nil 对手的 PlayerState
 --- @return number finalPoints
 --- @return table details
@@ -215,14 +215,27 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
     details.kingCount = kingCount
 
     -- =======================================================================
-    -- 7. 10 效果: 每张弃置过的 10 给最终点数 +1
+    -- 7. 10 效果: 对方每张10使己方点数 + (己方非普通牌数量 × 2)
     -- =======================================================================
+    local opponentTenCount = 0
+    for _, card in ipairs(opponentHand) do
+        if card.rank == 10 then
+            opponentTenCount = opponentTenCount + 1
+        end
+    end
     local tenBonus = 0
-    if playerState then
-        tenBonus = playerState.discardedTenCount
+    if opponentTenCount > 0 then
+        local myNonNormalCount = 0
+        for _, card in ipairs(hand) do
+            if not Card.IsNormal(card) then
+                myNonNormalCount = myNonNormalCount + 1
+            end
+        end
+        tenBonus = myNonNormalCount * 2 * opponentTenCount
     end
     totalPoints = totalPoints + tenBonus
     details.tenBonus = tenBonus
+    details.opponentTenCount = opponentTenCount
 
     details.basePoints = totalPoints
     details.finalPoints = totalPoints
