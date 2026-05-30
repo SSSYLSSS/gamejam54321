@@ -168,18 +168,7 @@ function GameScene.Update(dt)
             else
                 SFXManager.Play("flipCard")
             end
-            -- AI小王延迟效果: 翻到小王时触发玩家手牌半透明化+光效
-            if anim.aiSmallJokerIdx and anim.revealedCount >= anim.aiSmallJokerIdx and not anim.jokerRevealTriggered then
-                anim.jokerRevealTriggered = true
-                -- 重新计算玩家裸分(用真实手牌)
-                local RuleEngine = require("system.RuleEngine")
-                local gs = GameController.GetState()
-                local emptyHand = {}
-                anim.playerRawPoints, _ = RuleEngine.CalculatePoints(anim.playerHand, emptyHand,
-                    gs and gs.player or nil, nil)
-                -- 发射光效: 从小王→被移除的玩家牌
-                GameScene._EmitSmallJokerBeam()
-            end
+
             GameScene._UpdateSettlementOverlay()
         end
     else
@@ -218,10 +207,7 @@ function GameScene.HandleEscape()
         GameScene._ClosePileView()
         return true
     end
-    local jackOverlay = uiRoot and uiRoot:FindById("jackPickOverlay")
-    if jackOverlay then
-        return true  -- J选牌时不允许ESC退出
-    end
+
     return false
 end
 
@@ -650,7 +636,10 @@ function GameScene._RefreshAIHand()
                       phase == Constant.PHASE.ROUND_END)
 
     for _, card in ipairs(hand) do
-        local widget = CardWidget.Create(showCards and card or nil, { isAI = true })
+        local widget = CardWidget.Create(showCards and card or nil, {
+            isAI = true,
+            glowCard = card,  -- 即使牌背面也显示光效
+        })
         panel:AddChild(widget)
         table.insert(aiHandWidgets, widget)
     end
@@ -881,13 +870,6 @@ function GameScene._OnAction()
         end
         selectedCards = {}
 
-        -- 检查J效果
-        if GameController.GetPendingJackPicks() > 0 then
-            GameScene.Refresh()
-            GameScene._ShowJackPickUI()
-            return
-        end
-
         -- 完成玩家回合
         GameController.FinishPlayerTurn()
         selectedCards = {}
@@ -1042,10 +1024,10 @@ function GameScene._HandleJokerPhase()
     local hasBig = GameController.PlayerHasBigJoker()
 
     if hasSmall then
-        -- 玩家有小王: 显示选择UI让玩家选择移除AI的哪张牌
-        GameScene._ShowSmallJokerChoiceUI()
+        -- 玩家有小王: 显示点数选择UI(0-13)
+        GameScene._ShowSmallJokerValueUI()
     elseif hasBig then
-        -- 玩家有大王: 显示点数选择UI
+        -- 玩家有大王: 显示目标牌+点数选择UI
         GameScene._ShowBigJokerChoiceUI()
     else
         -- 玩家无鬼牌，直接结算
@@ -1054,46 +1036,23 @@ function GameScene._HandleJokerPhase()
     end
 end
 
---- 小王选择UI: 让玩家选择移除AI的哪张牌(看不见对方卡牌,显示牌背)
-function GameScene._ShowSmallJokerChoiceUI()
+--- 小王点数选择UI: 让玩家选择0-13作为小王自身点数
+function GameScene._ShowSmallJokerValueUI()
     if not uiRoot then return end
-    local aiHand = GameController.GetAIHand()
 
-    -- 收集可选索引(排除7)
-    local selectableIndices = {}
-    for i, card in ipairs(aiHand) do
-        if card.rank ~= 7 then
-            table.insert(selectableIndices, i)
-        end
-    end
-
-    -- 如果AI所有牌都是7(极端情况), 直接跳过
-    if #selectableIndices == 0 then
-        GameController.PlayerSetSmallJokerValue()
-        GameScene._AfterSmallJokerChoice()
-        return
-    end
-
-    -- 创建牌背按钮(玩家看不见对方卡牌)
-    local cardBackWidgets = {}
-    for _, idx in ipairs(selectableIndices) do
-        table.insert(cardBackWidgets, UI.Button {
-            width = 70,
-            height = 100,
-            backgroundColor = { 60, 75, 110, 255 },
-            hoverBackgroundColor = { 80, 100, 145, 255 },
+    local valueButtons = {}
+    for v = 0, 13 do
+        table.insert(valueButtons, UI.Button {
+            text = tostring(v),
+            width = 44,
+            height = 36,
+            fontSize = 14,
+            backgroundColor = { 80, 40, 140, 220 },
             borderRadius = 6,
-            borderWidth = 1,
-            borderColor = { 85, 95, 130, 200 },
-            justifyContent = "center",
-            alignItems = "center",
-            children = {
-                UI.Label { text = "?", fontSize = 28, fontColor = { 120, 140, 180, 255 } },
-            },
             onPointerEnter = function() SFXManager.Play("buttonFocus") end,
             onClick = function()
                 SFXManager.Play("buttonPress")
-                GameScene._OnSmallJokerChoice(idx)
+                GameScene._OnSmallJokerValueChosen(v)
             end,
         })
     end
@@ -1108,7 +1067,7 @@ function GameScene._ShowSmallJokerChoiceUI()
         alignItems = "center",
         children = {
             UI.Panel {
-                width = 360,
+                width = 340,
                 backgroundColor = Colors.menuCard,
                 borderRadius = 12,
                 borderWidth = 1,
@@ -1118,19 +1077,22 @@ function GameScene._ShowSmallJokerChoiceUI()
                 alignItems = "center",
                 children = {
                     UI.Label {
-                        text = "小王效果",
+                        text = "小王 - 选择点数",
                         fontSize = 18,
                         fontColor = Colors.jokerPurple,
                     },
                     UI.Label {
-                        text = string.format("对方有 %d 张牌，随机选择一张移除:", #selectableIndices),
+                        text = "选择0~13作为小王的点数",
                         fontSize = 13,
                         fontColor = Colors.textDim,
                         textAlign = "center",
                     },
                     UI.Panel {
-                        flexDirection = "row", gap = 8, flexWrap = "wrap", justifyContent = "center",
-                        children = cardBackWidgets,
+                        flexDirection = "row",
+                        flexWrap = "wrap",
+                        justifyContent = "center",
+                        gap = 6,
+                        children = valueButtons,
                     },
                 }
             },
@@ -1139,29 +1101,15 @@ function GameScene._ShowSmallJokerChoiceUI()
     uiRoot:AddChild(overlay)
 end
 
--- 玩家小王移除的AI牌(用于结算时半透明展示)
-local playerSmallJokerRemovedCard = nil
-local playerSmallJokerRemovedIdx = nil
-
-function GameScene._OnSmallJokerChoice(idx)
+function GameScene._OnSmallJokerValueChosen(value)
     -- 关闭选择UI
     local overlay = uiRoot:FindById("jokerChoiceOverlay")
     if overlay then overlay:Remove() end
 
-    -- 记录被移除的AI牌信息(用于结算半透明展示)
-    local aiHand = GameController.GetAIHand()
-    playerSmallJokerRemovedCard = aiHand[idx]
-    playerSmallJokerRemovedIdx = idx
+    -- 设置小王点数
+    GameController.PlayerSetSmallJokerValue(value)
+    GameScene.SetInfo(string.format("小王点数设为: %d", value))
 
-    -- 执行小王效果
-    GameController.PlayerSmallJokerEffect(idx)
-    -- 设置小王自身点数
-    GameController.PlayerSetSmallJokerValue()
-
-    GameScene._AfterSmallJokerChoice()
-end
-
-function GameScene._AfterSmallJokerChoice()
     -- 小王处理完, 检查是否还有大王需要选择
     if GameController.PlayerHasBigJoker() then
         GameScene._ShowBigJokerChoiceUI()
@@ -1453,46 +1401,37 @@ function GameScene._ShowSettlementResult(result)
     local aiHand = GameController.GetAIHand()
     local playerHand = GameController.GetPlayerHand()
 
-    -- AI小王延迟展示: 获取被移除的玩家牌信息
-    local aiSmallJokerRemoved = GameController.GetAISmallJokerRemoved()
-    -- 找出AI小王在AI手牌中的索引(翻到此索引时触发视觉移除)
-    local aiSmallJokerIdx = nil
-    if aiSmallJokerRemoved then
-        for i, card in ipairs(aiHand) do
-            if card.rank == 14 then
-                aiSmallJokerIdx = i
-                break
-            end
-        end
-    end
-
-    -- 用于展示的玩家手牌(翻到AI小王前包含被移除的那张)
+    -- 结算时手牌已经是最终状态(鬼牌效果已执行), 直接使用
     local displayPlayerHand = {}
     for _, c in ipairs(playerHand) do
         table.insert(displayPlayerHand, c)
     end
-    if aiSmallJokerRemoved and aiSmallJokerIdx then
-        -- 把被移除的牌加回到展示列表(在翻到小王前显示)
-        table.insert(displayPlayerHand, aiSmallJokerRemoved)
-    end
 
-    -- 玩家小王移除的AI牌: 构建展示用AI手牌(包含被移除的牌,半透明显示)
+    -- 排序AI手牌: 普通(2-7) → 稀有(8-10) → 罕见(J-K) → Ace → 鬼牌
     local displayAIHand = {}
     for _, c in ipairs(aiHand) do
         table.insert(displayAIHand, c)
     end
-    if playerSmallJokerRemovedCard and playerSmallJokerRemovedIdx then
-        -- 插回原位置
-        table.insert(displayAIHand, playerSmallJokerRemovedIdx, playerSmallJokerRemovedCard)
-    end
+    table.sort(displayAIHand, function(a, b)
+        local function categoryOrder(card)
+            if Card.IsNormal(card) then return 1 end       -- 2-7: 普通
+            if card.rank >= 8 and card.rank <= 10 then return 2 end  -- 8-10: 稀有
+            if Card.IsFace(card) then return 3 end         -- J-K: 罕见
+            if card.rank == 1 then return 4 end            -- Ace
+            if Card.IsJoker(card) then return 5 end        -- 鬼牌
+            return 1
+        end
+        local oa, ob = categoryOrder(a), categoryOrder(b)
+        if oa ~= ob then return oa < ob end
+        return a.rank < b.rank
+    end)
 
     -- 计算玩家"裸分"(不含对方效果影响的基础得分)
     local RuleEngine = require("system.RuleEngine")
     local playerRawPts = 0
-    if not result.sevenRuleTriggered then
+    do
         local emptyHand = {}
         local gs = GameController.GetState()
-        -- 用展示手牌计算裸分(含被移除的牌)
         playerRawPts, _ = RuleEngine.CalculatePoints(displayPlayerHand, emptyHand,
             gs and gs.player or nil, nil)
     end
@@ -1501,22 +1440,14 @@ function GameScene._ShowSettlementResult(result)
         result = result,
         aiHand = aiHand,
         playerHand = playerHand,
-        displayPlayerHand = displayPlayerHand,  -- 展示用(可能比playerHand多一张)
-        displayAIHand = displayAIHand,  -- 展示用AI手牌(包含被玩家小王移除的牌)
-        playerRawPoints = playerRawPts,  -- 翻牌期间展示的裸分
-        aiSmallJokerRemoved = aiSmallJokerRemoved,  -- 被AI小王移除的牌
-        aiSmallJokerIdx = aiSmallJokerIdx,  -- AI小王在手牌中的索引
-        playerSmallJokerRemovedCard = playerSmallJokerRemovedCard,  -- 被玩家小王移除的AI牌
-        playerSmallJokerRemovedIdx = playerSmallJokerRemovedIdx,  -- 在AI手牌中的原始索引
-        jokerRevealTriggered = false,  -- 是否已触发小王视觉移除
+        displayPlayerHand = displayPlayerHand,
+        displayAIHand = displayAIHand,  -- 已排序的展示用AI手牌
+        playerRawPoints = playerRawPts,
         revealedCount = 0,
         timer = 0,
         interval = 1.0,  -- 每1.0秒翻一张
         finished = false,
     }
-    -- 清理玩家小王记录(本局已用)
-    playerSmallJokerRemovedCard = nil
-    playerSmallJokerRemovedIdx = nil
     -- 创建结算弹窗
     GameScene._CreateSettlementOverlay()
 end
@@ -1548,26 +1479,22 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
     local aiCount = #displayAIHand  -- 使用展示手牌数量计算布局
     local playerCount = #playerHand
 
-    -- 将 aiHand 索引映射到 displayAIHand 索引(考虑插入的半透明牌)
     local displayRevealedIdx = revealedIdx
-    if anim.playerSmallJokerRemovedIdx and revealedIdx >= anim.playerSmallJokerRemovedIdx then
-        displayRevealedIdx = revealedIdx + 1
-    end
 
     -- 判断哪些玩家牌受影响
     local affectedIndices = {}
     local beamColor = { r = 0.6, g = 0.4, b = 1.0 }  -- 默认紫色
 
-    if aiCard.rank == 11 then
-        -- J: 影响玩家所有普通牌(2-6)
-        beamColor = { r = 0.6, g = 0.3, b = 1.0 }
+    if aiCard.rank == 13 then
+        -- K: 对方普通牌+稀有牌×2
+        beamColor = { r = 1.0, g = 0.8, b = 0.2 }
         for i, card in ipairs(playerHand) do
-            if Card.IsNormal(card) then
+            if Card.IsNormal(card) or (card.rank >= 8 and card.rank <= 10) then
                 table.insert(affectedIndices, i)
             end
         end
     elseif aiCard.rank == 12 then
-        -- Q: 影响玩家点数最大的普通牌
+        -- Q: 对方最高普通牌×2
         beamColor = { r = 0.8, g = 0.2, b = 0.9 }
         local maxIdx, maxPts = nil, -1
         for i, card in ipairs(playerHand) do
@@ -1583,7 +1510,7 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
             table.insert(affectedIndices, maxIdx)
         end
     elseif aiCard.rank == 1 then
-        -- A: 影响玩家同花色的牌
+        -- A: 对方同花色的牌×2
         beamColor = { r = 1.0, g = 0.4, b = 0.3 }
         for i, card in ipairs(playerHand) do
             if card.suit and card.suit == aiCard.suit then
@@ -1591,7 +1518,7 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
             end
         end
     elseif aiCard.rank == 8 then
-        -- 8: 影响玩家所有普通牌(2-6)
+        -- 8: 对方所有普通牌+2
         beamColor = { r = 1.0, g = 0.7, b = 0.2 }
         for i, card in ipairs(playerHand) do
             if Card.IsNormal(card) then
@@ -1627,14 +1554,14 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
     if #affectedIndices > 0 then
         -- 确定效果描述文字
         local effectText = ""
-        if aiCard.rank == 11 then
-            effectText = "点数-1"
+        if aiCard.rank == 13 then
+            effectText = "×2"
         elseif aiCard.rank == 12 then
             effectText = "×2"
         elseif aiCard.rank == 1 then
             effectText = "×2"
         elseif aiCard.rank == 8 then
-            effectText = "普通牌+2"
+            effectText = "+2"
         end
 
         for _, pIdx in ipairs(affectedIndices) do
@@ -1662,22 +1589,26 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
         local pBeamColor = { r = 0.3, g = 0.8, b = 1.0 }
         local pEffectText = ""
 
-        if pCard.rank == 11 and Card.IsNormal(aiCard2) then
+        if pCard.rank == 13 and (Card.IsNormal(aiCard2) or (aiCard2.rank >= 8 and aiCard2.rank <= 10)) then
+            -- K: 对方普通牌+稀有牌×2
             shouldBeam = true
-            pBeamColor = { r = 0.3, g = 0.5, b = 1.0 }
-            pEffectText = "点数-1"
+            pBeamColor = { r = 1.0, g = 0.8, b = 0.2 }
+            pEffectText = "×2"
         elseif pCard.rank == 12 and Card.IsNormal(aiCard2) then
+            -- Q: 对方最高普通牌×2 (这里简化为标记)
             shouldBeam = true
             pBeamColor = { r = 0.5, g = 0.2, b = 1.0 }
             pEffectText = "×2"
         elseif pCard.rank == 1 and aiCard2.suit and pCard.suit == aiCard2.suit then
+            -- A: 同花色×2
             shouldBeam = true
             pBeamColor = { r = 0.2, g = 1.0, b = 0.5 }
             pEffectText = "×2"
         elseif pCard.rank == 8 and Card.IsNormal(aiCard2) then
+            -- 8: 对方普通牌-2
             shouldBeam = true
             pBeamColor = { r = 0.2, g = 0.9, b = 0.7 }
-            pEffectText = "普通牌-1"
+            pEffectText = "-2"
         end
 
         if shouldBeam then
@@ -1699,60 +1630,7 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
     end
 end
 
---- 小王翻出时发射光效: 从AI小王→被移除的玩家牌
-function GameScene._EmitSmallJokerBeam()
-    local anim = settlementAnim
-    if not anim or not anim.aiSmallJokerIdx or not anim.aiSmallJokerRemoved then return end
 
-    local sw = graphics:GetWidth() / graphics:GetDPR()
-    local sh = graphics:GetHeight() / graphics:GetDPR()
-
-    -- AI小王位置(使用displayAIHand计算布局)
-    local displayAIHand = anim.displayAIHand or anim.aiHand
-    local aiCount = #displayAIHand
-    local aiCardW = 120
-    local aiCardH = 168
-    local aiTotalW = aiCount * aiCardW + (aiCount - 1) * 12
-    local centerAreaLeft = 90
-    local centerAreaW = sw - 180
-    local aiStartX = centerAreaLeft + (centerAreaW - aiTotalW) * 0.5
-    local aiY = 50 + 6 + 13 + 6 + aiCardH * 0.5
-
-    -- 将 aiHand 索引映射到 displayAIHand 索引
-    local displayJokerIdx = anim.aiSmallJokerIdx
-    if anim.playerSmallJokerRemovedIdx and anim.aiSmallJokerIdx >= anim.playerSmallJokerRemovedIdx then
-        displayJokerIdx = anim.aiSmallJokerIdx + 1
-    end
-
-    local srcX = aiStartX + (displayJokerIdx - 1) * (aiCardW + 12) + aiCardW * 0.5
-    local srcY = aiY
-
-    -- 被移除的玩家牌位置(在 displayPlayerHand 的末尾)
-    local playerHand = anim.displayPlayerHand or anim.playerHand
-    local playerCount = #playerHand
-    local removedIdx = playerCount  -- 被移除的牌在末尾
-
-    local playerCardW = 216
-    local playerCardH = 300
-    local playerTotalW = playerCount * playerCardW + (playerCount - 1) * 12
-    local playerStartX = centerAreaLeft + (centerAreaW - playerTotalW) * 0.5
-    local playerY = sh - 60 - 6 - 13 - 6 - playerCardH * 0.5
-
-    local destX = playerStartX + (removedIdx - 1) * (playerCardW + 12) + playerCardW * 0.5
-    local destY = playerY
-
-    -- 发射紫色光束连接两张牌
-    VFXManager.EmitLightBeam(srcX, srcY, destX, destY, {
-        r = 0.7, g = 0.2, b = 1.0,
-        duration = 1.5,
-    })
-    -- 在被移除的玩家牌上方飘字提示
-    VFXManager.EmitFloatingText(destX, destY - playerCardH * 0.5 - 10, "移除!", {
-        r = 0.7, g = 0.2, b = 1.0,
-        duration = 1.4,
-        fontSize = 18,
-    })
-end
 
 --- 更新结算内容(每翻一张牌时调用)
 function GameScene._UpdateSettlementOverlay()
@@ -1804,28 +1682,12 @@ function GameScene._UpdateAIHandInPlace()
     aiHandWidgets = {}
     panel:ClearChildren()
 
-    -- 使用 displayAIHand(包含被玩家小王移除的牌)
+    -- 使用 displayAIHand 逐张翻牌
     local hand = anim.displayAIHand or anim.aiHand
-    local removedIdx = anim.playerSmallJokerRemovedIdx  -- 被玩家小王移除的牌索引
-
-    -- 计算真实翻牌进度(displayAIHand 可能比 aiHand 多一张)
-    -- revealedCount 基于 aiHand 长度, 需要映射到 displayAIHand 索引
-    local revealedInDisplay = anim.revealedCount
-    if removedIdx and anim.revealedCount > 0 then
-        -- 如果已翻过的牌索引 >= removedIdx, 需要+1偏移
-        if anim.revealedCount >= removedIdx then
-            revealedInDisplay = anim.revealedCount + 1
-        end
-    end
 
     for i, card in ipairs(hand) do
         local widget
-        local isRemovedCard = removedIdx and (i == removedIdx) and anim.playerSmallJokerRemovedCard
-        if isRemovedCard then
-            -- 被玩家小王移除的牌: 始终正面显示+半透明
-            widget = CardWidget.Create(card, { isAI = true })
-            widget:SetStyle({ opacity = 0.3 })
-        elseif i <= revealedInDisplay and not isRemovedCard then
+        if i <= anim.revealedCount then
             -- 已翻开: 正面显示
             widget = CardWidget.Create(card, { isAI = true })
         else
@@ -1837,7 +1699,7 @@ function GameScene._UpdateAIHandInPlace()
     end
 end
 
---- 结算时更新玩家手牌显示(小王触发时半透明化被移除的牌)
+--- 结算时更新玩家手牌显示
 function GameScene._UpdatePlayerHandInPlace()
     local anim = settlementAnim
     if not anim then return end
@@ -1851,17 +1713,10 @@ function GameScene._UpdatePlayerHandInPlace()
     playerHandWidgets = {}
     panel:ClearChildren()
 
-    -- 使用 displayPlayerHand 显示(包含被小王移除的牌)
     local hand = anim.displayPlayerHand or anim.playerHand
-    local removedCard = anim.aiSmallJokerRemoved
 
-    for i, card in ipairs(hand) do
+    for _, card in ipairs(hand) do
         local widget = CardWidget.Create(card, { skipTooltip = true })
-        -- 判断是否是被小王移除的那张牌(在列表末尾)
-        local isRemovedCard = removedCard and (i == #hand) and (#hand > #anim.playerHand)
-        if isRemovedCard and anim.jokerRevealTriggered then
-            widget:SetStyle({ opacity = 0.3 })
-        end
         panel:AddChild(widget)
         table.insert(playerHandWidgets, widget)
     end
@@ -1966,107 +1821,165 @@ local function buildEffectDetails(hand, details, isPlayer)
     if not details then return {} end
 
     local effects = {}
-    local effectColor = { 200, 180, 120, 255 }
+    local headerColor = { 220, 200, 140, 255 }
+    local formulaColor = { 200, 200, 200, 255 }
+    local effectColor = { 180, 180, 120, 255 }
 
-    -- K 效果
-    if details.kingApplied then
+    -- ===== 逐张运算过程 =====
+    if details.cardBreakdown and #details.cardBreakdown > 0 then
+        -- 标题
         table.insert(effects, UI.Label {
-            text = "K: 对方点数向上取整到十位, 己方点数向下取整到十位",
+            text = "逐张计算:",
             fontSize = 11,
+            fontColor = headerColor,
+        })
+
+        -- 逐张展示: 基础点 → 效果 → 最终
+        for _, entry in ipairs(details.cardBreakdown) do
+            local line
+            if #entry.effects > 0 then
+                line = string.format("  %s: %d → %s → %d",
+                    entry.name, entry.base,
+                    table.concat(entry.effects, " → "),
+                    entry.final)
+            else
+                line = string.format("  %s: %d", entry.name, entry.final)
+            end
+            table.insert(effects, UI.Label {
+                text = line,
+                fontSize = 10,
+                fontColor = formulaColor,
+            })
+        end
+
+        -- 求和公式
+        local parts = {}
+        local sum = 0
+        for _, entry in ipairs(details.cardBreakdown) do
+            table.insert(parts, tostring(entry.final))
+            sum = sum + entry.final
+        end
+        local sumLine = "  合计: " .. table.concat(parts, " + ") .. " = " .. sum
+        table.insert(effects, UI.Label {
+            text = sumLine,
+            fontSize = 10,
+            fontColor = { 160, 220, 160, 255 },
+        })
+    end
+
+    -- ===== 触发的效果摘要 =====
+    local hasEffectSummary = false
+
+    -- 8 效果
+    if (details.eightEffects and details.eightEffects > 0) or (details.opponentEightCount and details.opponentEightCount > 0) then
+        if not hasEffectSummary then
+            table.insert(effects, UI.Label { text = "生效效果:", fontSize = 11, fontColor = headerColor })
+            hasEffectSummary = true
+        end
+        local parts = {}
+        if details.eightEffects > 0 then
+            table.insert(parts, string.format("己方8×%d: 己方普通牌各-%d", details.eightEffects, details.eightEffects * 2))
+        end
+        if details.opponentEightCount > 0 then
+            table.insert(parts, string.format("对方8×%d: 己方普通牌各+%d", details.opponentEightCount, details.opponentEightCount * 2))
+        end
+        table.insert(effects, UI.Label {
+            text = "  8: " .. table.concat(parts, "; "),
+            fontSize = 10,
+            fontColor = effectColor,
+        })
+    end
+
+    -- J 效果
+    if details.jackActive then
+        if not hasEffectSummary then
+            table.insert(effects, UI.Label { text = "生效效果:", fontSize = 11, fontColor = headerColor })
+            hasEffectSummary = true
+        end
+        table.insert(effects, UI.Label {
+            text = "  J: 己方普通牌(2-7)点数→0",
+            fontSize = 10,
+            fontColor = { 200, 100, 255, 255 },
+        })
+    end
+
+    -- K 效果 (被对方K影响)
+    if details.kingActive then
+        if not hasEffectSummary then
+            table.insert(effects, UI.Label { text = "生效效果:", fontSize = 11, fontColor = headerColor })
+            hasEffectSummary = true
+        end
+        table.insert(effects, UI.Label {
+            text = "  K(对方): 己方普通牌+稀有牌点数×2",
+            fontSize = 10,
             fontColor = { 255, 160, 60, 255 },
         })
     end
 
-    -- A 翻倍效果(被对方A翻倍)
+    -- A 翻倍效果 (被对方A翻倍)
     if details.aceEffects and #details.aceEffects > 0 then
+        if not hasEffectSummary then
+            table.insert(effects, UI.Label { text = "生效效果:", fontSize = 11, fontColor = headerColor })
+            hasEffectSummary = true
+        end
         local suits = {}
         for _, s in ipairs(details.aceEffects) do
             table.insert(suits, Constant.SUIT_SYMBOLS[s] or s)
         end
         table.insert(effects, UI.Label {
-            text = string.format("被对方A翻倍花色: %s", table.concat(suits, " ")),
-            fontSize = 11,
+            text = string.format("  A(对方): 己方%s花色牌点数×2", table.concat(suits, "")),
+            fontSize = 10,
             fontColor = { 255, 120, 120, 255 },
         })
     end
 
-    -- Q 效果
-    if details.queenTripled and details.queenDoubleMap then
-        local qCount = details.queenCount or 1
-        table.insert(effects, UI.Label {
-            text = string.format("被对方Q效果(%d张): 最大普通牌点数×2", qCount),
-            fontSize = 11,
-            fontColor = { 180, 80, 200, 255 },
-        })
-    end
-
-    -- 8 效果
-    if (details.eightEffects and details.eightEffects > 0) or (details.opponentEightCount and details.opponentEightCount > 0) then
-        local parts = {}
-        if details.eightEffects and details.eightEffects > 0 then
-            table.insert(parts, string.format("己方普通牌各-%d", details.eightEffects))
-        end
-        if details.opponentEightCount and details.opponentEightCount > 0 then
-            table.insert(parts, string.format("己方普通牌各+%d(对方8)", details.opponentEightCount * 2))
+    -- 10 效果
+    if details.tenReduce and details.tenReduce > 0 then
+        if not hasEffectSummary then
+            table.insert(effects, UI.Label { text = "生效效果:", fontSize = 11, fontColor = headerColor })
+            hasEffectSummary = true
         end
         table.insert(effects, UI.Label {
-            text = "8效果: " .. table.concat(parts, ", "),
-            fontSize = 11,
-            fontColor = effectColor,
+            text = string.format("  10: 己方稀有+罕见牌各-9(总计-%d)", details.tenReduce),
+            fontSize = 10,
+            fontColor = { 100, 200, 200, 255 },
         })
     end
 
     -- 9 灵活
     if details.nineFlexSaved and details.nineFlexSaved > 0 then
+        if not hasEffectSummary then
+            table.insert(effects, UI.Label { text = "生效效果:", fontSize = 11, fontColor = headerColor })
+            hasEffectSummary = true
+        end
         table.insert(effects, UI.Label {
-            text = string.format("9灵活: 选择视为0(节省%d点)", details.nineFlexSaved),
-            fontSize = 11,
+            text = string.format("  9灵活: 视为0(节省%d点)", details.nineFlexSaved),
+            fontSize = 10,
             fontColor = effectColor,
         })
     end
 
-    -- J 翻倍效果
-    if details.opponentJackCount and details.opponentJackCount > 0 then
-        table.insert(effects, UI.Label {
-            text = string.format("被对方J效果(%d张): 普通牌点数×%d", details.opponentJackCount, 2 ^ details.opponentJackCount),
-            fontSize = 11,
-            fontColor = { 200, 100, 255, 255 },
-        })
-    end
-
-    -- 10 弃置加分
-    if details.tenBonus and details.tenBonus > 0 then
-        table.insert(effects, UI.Label {
-            text = string.format("10弃置奖励: +%d点", details.tenBonus),
-            fontSize = 11,
-            fontColor = { 100, 200, 100, 255 },
-        })
-    end
-
-    -- 运算过程(逐张计算展示)
-    if details.cardBreakdown and #details.cardBreakdown > 0 then
-        local parts = {}
-        for _, entry in ipairs(details.cardBreakdown) do
-            if #entry.effects > 0 then
-                table.insert(parts, string.format("%s(%d→%d)", entry.name, entry.base, entry.final))
-            else
-                table.insert(parts, string.format("%s(%d)", entry.name, entry.final))
-            end
+    -- Q 效果 (己方Q对对方的影响 / 己方被取整)
+    if details.queenFloor then
+        if not hasEffectSummary then
+            table.insert(effects, UI.Label { text = "生效效果:", fontSize = 11, fontColor = headerColor })
+            hasEffectSummary = true
         end
-        local sum = 0
-        for _, entry in ipairs(details.cardBreakdown) do
-            sum = sum + entry.final
-        end
-        local formulaText = table.concat(parts, " + ")
-        if details.tenBonus and details.tenBonus > 0 then
-            formulaText = formulaText .. string.format(" + 10奖励(%d)", details.tenBonus)
-            sum = sum + details.tenBonus
-        end
-        formulaText = formulaText .. " = " .. sum
         table.insert(effects, UI.Label {
-            text = "计算: " .. formulaText,
+            text = "  Q(己方): 己方点数取至十位(向下)",
             fontSize = 10,
-            fontColor = { 180, 180, 180, 255 },
+            fontColor = { 180, 80, 200, 255 },
+        })
+    end
+    if details.queenTriple and details.queenTriple > 0 then
+        if not hasEffectSummary then
+            table.insert(effects, UI.Label { text = "生效效果:", fontSize = 11, fontColor = headerColor })
+            hasEffectSummary = true
+        end
+        table.insert(effects, UI.Label {
+            text = string.format("  Q(己方): 对方最高普通牌×2(+%d给对方)", details.queenTriple),
+            fontSize = 10,
+            fontColor = { 180, 80, 200, 255 },
         })
     end
 
@@ -2099,31 +2012,84 @@ function GameScene._ShowSettlementContinueBtn()
     end
 
     -- 点数信息
-    local ptsInfo = string.format("你: %d点  AI: %d点",
-        anim.result.playerPoints or 0, anim.result.aiPoints or 0)
+    local playerPts = anim.result.playerPoints or 0
+    local aiPts = anim.result.aiPoints or 0
+    local ptsInfo = string.format("你: %d点  AI: %d点", playerPts, aiPts)
 
-    -- 距离21
+    -- 距离21 + 爆点提示
     local distInfo = ""
     if not anim.result.sevenRuleTriggered then
-        local playerDist = math.abs(GameConfig.TARGET_POINTS - (anim.result.playerPoints or 0))
-        local aiDist = math.abs(GameConfig.TARGET_POINTS - (anim.result.aiPoints or 0))
-        distInfo = string.format("距21: 你%d  AI%d", playerDist, aiDist)
+        local playerDist = math.abs(GameConfig.TARGET_POINTS - playerPts)
+        local aiDist = math.abs(GameConfig.TARGET_POINTS - aiPts)
+        local playerOverStr = playerPts > GameConfig.TARGET_POINTS and "(爆)" or ""
+        local aiOverStr = aiPts > GameConfig.TARGET_POINTS and "(爆)" or ""
+        distInfo = string.format("距21: 你%d%s  AI%d%s", playerDist, playerOverStr, aiDist, aiOverStr)
     end
 
     -- 效果详情
     local detailChildren = {}
     if not anim.result.sevenRuleTriggered then
-        local playerEffects = buildEffectDetails(anim.playerHand, anim.result.playerDetails, true)
-        local aiEffects = buildEffectDetails(anim.aiHand, anim.result.aiDetails, false)
+        local playerDetails = anim.result.playerDetails
+        local aiDetails = anim.result.aiDetails
+        local playerEffects = buildEffectDetails(anim.playerHand, playerDetails, true)
+        local aiEffects = buildEffectDetails(anim.aiHand, aiDetails, false)
         if #playerEffects > 0 then
-            table.insert(detailChildren, UI.Label { text = "-- 你的效果 --", fontSize = 11, fontColor = Colors.textDim })
+            table.insert(detailChildren, UI.Label { text = "── 你 ──", fontSize = 11, fontColor = Colors.textDim })
             for _, w in ipairs(playerEffects) do
                 table.insert(detailChildren, w)
             end
         end
         if #aiEffects > 0 then
-            table.insert(detailChildren, UI.Label { text = "-- AI的效果 --", fontSize = 11, fontColor = Colors.textDim })
+            table.insert(detailChildren, UI.Label { text = "── AI ──", fontSize = 11, fontColor = Colors.textDim })
             for _, w in ipairs(aiEffects) do
+                table.insert(detailChildren, w)
+            end
+        end
+
+        -- Q的跨玩家最终处理步骤(在两方明细之后统一展示)
+        local hasQueenStep = false
+        local queenStepChildren = {}
+        -- 玩家Q对AI的加分
+        if playerDetails and playerDetails.queenTriple and playerDetails.queenTriple > 0 then
+            hasQueenStep = true
+            local preAiPts = aiPts - playerDetails.queenTriple
+            table.insert(queenStepChildren, UI.Label {
+                text = string.format("  你的Q → AI点数: %d + %d = %d", preAiPts, playerDetails.queenTriple, aiPts),
+                fontSize = 10,
+                fontColor = { 180, 80, 200, 255 },
+            })
+        end
+        -- AI的Q对玩家的加分
+        if aiDetails and aiDetails.queenTriple and aiDetails.queenTriple > 0 then
+            hasQueenStep = true
+            local prePlayerPts = playerPts - aiDetails.queenTriple
+            table.insert(queenStepChildren, UI.Label {
+                text = string.format("  AI的Q → 你点数: %d + %d = %d", prePlayerPts, aiDetails.queenTriple, playerPts),
+                fontSize = 10,
+                fontColor = { 180, 80, 200, 255 },
+            })
+        end
+        -- 玩家Q取整(己方点数向下取至十位)
+        if playerDetails and playerDetails.queenFloor then
+            hasQueenStep = true
+            table.insert(queenStepChildren, UI.Label {
+                text = "  你的Q → 你点数向下取至十位",
+                fontSize = 10,
+                fontColor = { 180, 80, 200, 255 },
+            })
+        end
+        -- AI的Q取整
+        if aiDetails and aiDetails.queenFloor then
+            hasQueenStep = true
+            table.insert(queenStepChildren, UI.Label {
+                text = "  AI的Q → AI点数向下取至十位",
+                fontSize = 10,
+                fontColor = { 180, 80, 200, 255 },
+            })
+        end
+        if hasQueenStep then
+            table.insert(detailChildren, UI.Label { text = "── Q结算 ──", fontSize = 11, fontColor = { 180, 80, 200, 255 } })
+            for _, w in ipairs(queenStepChildren) do
                 table.insert(detailChildren, w)
             end
         end
@@ -2143,14 +2109,17 @@ function GameScene._ShowSettlementContinueBtn()
     if distInfo ~= "" then
         table.insert(contentChildren, UI.Label { text = distInfo, fontSize = 12, fontColor = Colors.textDim })
     end
-    -- 效果详情区域
+    -- 效果详情区域(可滚动)
     if #detailChildren > 0 then
         table.insert(contentChildren, UI.Panel {
             width = "100%", height = 1, backgroundColor = Colors.menuBorder, marginVertical = 4,
         })
-        for _, w in ipairs(detailChildren) do
-            table.insert(contentChildren, w)
-        end
+        table.insert(contentChildren, UI.ScrollView {
+            width = "100%",
+            maxHeight = 260,
+            flexShrink = 1,
+            children = detailChildren,
+        })
     end
     -- 继续按钮
     table.insert(contentChildren, UI.Panel {
@@ -2410,113 +2379,6 @@ function GameScene._ShowPileInfo(pileType)
 end
 
 -- ============================================================================
--- 内部: J效果弹窗
--- ============================================================================
-
-function GameScene._ShowJackPickUI()
-    local playerDeck, playerDiscard = GameController.GetPileCounts()
-    local remaining = GameController.GetPendingJackPicks()
-
-    local overlay = UI.Panel {
-        id = "jackPickOverlay",
-        width = "100%",
-        height = "100%",
-        position = "absolute",
-        backgroundColor = { 0, 0, 0, 200 },
-        justifyContent = "center",
-        alignItems = "center",
-        children = {
-            UI.Panel {
-                width = 300,
-                backgroundColor = Colors.menuCard,
-                borderRadius = 12,
-                borderWidth = 1,
-                borderColor = { 150, 80, 200, 150 },
-                padding = 24,
-                gap = 16,
-                alignItems = "center",
-                children = {
-                    UI.Label {
-                        text = "J 效果: 选择补牌来源",
-                        fontSize = 18,
-                        fontColor = Colors.jokerPurple,
-                    },
-                    UI.Label {
-                        text = string.format("逐张选择从弃牌堆还是抽牌堆补牌\n(剩余 %d 次)", remaining),
-                        fontSize = 13,
-                        fontColor = Colors.textDim,
-                        textAlign = "center",
-                    },
-                    UI.Button {
-                        text = string.format("从我的弃牌堆抽 (%d张)", playerDiscard),
-                        width = "100%",
-                        height = 44,
-                        fontSize = 14,
-                        backgroundColor = { 100, 45, 45, 220 },
-                        borderRadius = 8,
-                        disabled = playerDiscard == 0,
-                        onPointerEnter = function() SFXManager.Play("buttonFocus") end,
-                        onClick = function() GameScene._OnJackPick("discard") end,
-                    },
-                    UI.Button {
-                        text = string.format("从我的抽牌堆抽 (%d张)", playerDeck),
-                        width = "100%",
-                        height = 44,
-                        fontSize = 14,
-                        backgroundColor = { 45, 45, 100, 220 },
-                        borderRadius = 8,
-                        disabled = playerDeck == 0,
-                        onPointerEnter = function() SFXManager.Play("buttonFocus") end,
-                        onClick = function() GameScene._OnJackPick("deck") end,
-                    },
-                }
-            },
-        }
-    }
-
-    uiRoot:AddChild(overlay)
-end
-
-function GameScene._OnJackPick(source)
-    local success, err, card = GameController.PlayerJackPick(source)
-    if not success then
-        GameScene.SetInfo(err or "抽取失败")
-        return
-    end
-
-    -- J效果紫色闪光
-    local sw = graphics:GetWidth() / graphics:GetDPR()
-    local sh = graphics:GetHeight() / graphics:GetDPR()
-    VFXManager.EmitJackEffect(sw * 0.5, sh * 0.5)
-
-    -- 关闭弹窗
-    local overlay = uiRoot:FindById("jackPickOverlay")
-    if overlay then overlay:Remove() end
-
-    local cardName = card and Card.GetName(card) or "?"
-    GameScene.SetInfo(string.format("J效果: 从%s中随机抽到 %s",
-        source == "discard" and "弃牌堆" or "抽牌堆", cardName))
-
-    -- 还有J待处理?
-    if GameController.GetPendingJackPicks() > 0 then
-        GameScene.Refresh()
-        GameScene._ShowJackPickUI()
-    else
-        -- J全部处理完毕
-        GameController.FinishPlayerTurn()
-        selectedCards = {}
-        local newPhase = GameController.GetPhase()
-        if newPhase == Constant.PHASE.JOKER_EFFECT then
-            GameScene._HandleJokerPhase()
-        else
-            GameScene.SetInfo(string.format("选择要弃置的牌（至多%d张），或跳过",
-                GameController.GetMaxDiscard()))
-        end
-        GameScene.Refresh()
-    end
-end
-
--- ============================================================================
 -- 内部: 局间过渡动画
 -- ============================================================================
 
@@ -2530,7 +2392,7 @@ function GameScene._StartTransition(roundNum)
         roundNum = roundNum,
         scoreText = string.format("比分  %d : %d", pw, aw),
     }
-    SFXManager.Play("shuffle")
+    SFXManager.Play("shuffle", 4.0)
     GameScene._CreateTransitionOverlay()
 end
 

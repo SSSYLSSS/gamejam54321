@@ -31,7 +31,7 @@ Shared.EVENTS = {
     -- 玩家操作 (Client → Server)
     PLAYER_DISCARD     = "PlayerDiscard",
     PLAYER_SKIP        = "PlayerSkip",
-    PLAYER_JACK_PICK   = "PlayerJackPick",
+
     PLAYER_POST_DISCARD = "PlayerPostDiscard",
     PLAYER_POST_KEEP   = "PlayerPostKeep",
     PLAYER_CONTINUE    = "PlayerContinue",

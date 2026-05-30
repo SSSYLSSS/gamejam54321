@@ -93,14 +93,10 @@ function PhaseManager.PlayerDiscard(gameState, discardIndices)
     table.sort(discardIndices, function(a, b) return a > b end)
 
     local discarded = {}
-    local jackCount = 0
     for _, idx in ipairs(discardIndices) do
         local card = player:RemoveFromHand(idx)
         if card then
             table.insert(discarded, card)
-            if card.rank == 11 then
-                jackCount = jackCount + 1
-            end
         end
     end
 
@@ -109,29 +105,20 @@ function PhaseManager.PlayerDiscard(gameState, discardIndices)
         player:AddToDiscard(card)
     end
 
-    -- 追踪J弃牌数
-    player.discardedJackCount = player.discardedJackCount + jackCount
-
     if #discarded > 0 then
         local names = {}
         for _, c in ipairs(discarded) do table.insert(names, Card.GetName(c)) end
         gameState:AddLog(string.format("玩家弃置: %s", table.concat(names, ", ")))
     end
 
-    -- J效果: 弃置的牌中含有J → 所有补牌都变为玩家逐张选择(从弃牌堆或抽牌堆)
-    if jackCount > 0 then
-        player.pendingJackPicks = #discarded  -- 总弃牌数=总抽牌选择次数
-        gameState:AddLog(string.format("J 效果: 可逐张选择从弃牌堆或抽牌堆补牌 %d 次", #discarded))
-        round.subPhase = Constant.SUB_PHASE.JACK_PICK
-    else
-        -- 无J: 正常从抽牌堆补牌
-        player.pendingJackPicks = 0
-        for _ = 1, #discarded do
-            local card = DeckSystem.Draw(player.deck, round)
-            if card then
-                player:AddToHand(card)
-            end
+    -- 正常从抽牌堆补牌
+    for _ = 1, #discarded do
+        local card = DeckSystem.Draw(player.deck, round)
+        if card then
+            player:AddToHand(card)
         end
+    end
+    if #discarded > 0 then
         gameState:AddLog(string.format("玩家补牌 %d 张", #discarded))
     end
 
@@ -162,14 +149,10 @@ function PhaseManager.AITurn(gameState)
     table.sort(validIndices, function(a, b) return a > b end)
 
     local discarded = {}
-    local jackCount = 0
     for _, idx in ipairs(validIndices) do
         local card = ai:RemoveFromHand(idx)
         if card then
             table.insert(discarded, card)
-            if card.rank == 11 then
-                jackCount = jackCount + 1
-            end
         end
     end
 
@@ -178,9 +161,6 @@ function PhaseManager.AITurn(gameState)
         ai:AddToDiscard(card)
     end
 
-    -- 追踪J弃牌数
-    ai.discardedJackCount = ai.discardedJackCount + jackCount
-
     -- 记录AI弃置的具体牌
     if #discarded > 0 then
         local names = {}
@@ -188,24 +168,14 @@ function PhaseManager.AITurn(gameState)
         gameState:AddLog(string.format("AI 弃置: %s", table.concat(names, ", ")))
     end
 
-    -- J效果: 弃置含J → 所有补牌由AI从弃牌堆/抽牌堆智能选择
-    if jackCount > 0 then
-        ai.pendingJackPicks = #discarded
-        local jackDrawn = EffectSystem.AIJackPick(ai, round)
-        if #jackDrawn > 0 then
-            local jNames = {}
-            for _, c in ipairs(jackDrawn) do table.insert(jNames, Card.GetName(c)) end
-            gameState:AddLog(string.format("AI J效果补牌: %s", table.concat(jNames, ", ")))
+    -- 正常从抽牌堆补牌
+    for _ = 1, #discarded do
+        local card = DeckSystem.Draw(ai.deck, round)
+        if card then
+            ai:AddToHand(card)
         end
-    else
-        -- 无J: 正常从抽牌堆补牌
-        ai.pendingJackPicks = 0
-        for _ = 1, #discarded do
-            local card = DeckSystem.Draw(ai.deck, round)
-            if card then
-                ai:AddToHand(card)
-            end
-        end
+    end
+    if #discarded > 0 then
         gameState:AddLog(string.format("AI 补牌 %d 张", #discarded))
     end
 end

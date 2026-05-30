@@ -195,12 +195,9 @@ function ShowMultiplayer()
     currentScene = "multiplayer"
     VFXManager.ClearBloomImages()
 
-    -- 显示房间选择界面(创建/加入)
+    -- 显示匹配界面
     local root = MenuScene.BuildMultiplayerMenu({
-        onCreateRoom = function()
-            StartMultiplayerMatch()
-        end,
-        onJoinRoom = function()
+        onStartMatch = function()
             StartMultiplayerMatch()
         end,
         onBack = function()

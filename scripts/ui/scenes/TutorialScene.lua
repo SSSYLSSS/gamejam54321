@@ -14,62 +14,78 @@ local TutorialScene = {}
 
 local PAGES = {
     {
-        title = "游戏目标",
+        title = "游戏简介",
         icon = "🎯",
         content = {
-            { type = "text", value = "让手牌点数之和尽量接近 21 点！" },
+            { type = "text", value = "本游戏为卡牌对战博弈游戏，是21点的改版。" },
             { type = "gap" },
-            { type = "highlight", value = "双方比较谁更接近21点，更近者获胜\n超过21点不会直接判负，但距离会更远" },
+            { type = "highlight", value = "一轮游戏中，双方共进行5场对弈，\n先胜3场者赢得整场比赛。" },
             { type = "gap" },
-            { type = "text", value = "每局双方比较与21点的距离，更接近的一方获胜。" },
-            { type = "text", value = "先赢 3 局者赢得整场比赛。" },
+            { type = "text", value = "第一场开局时，双方抽牌堆各有54张牌。从中随机抽取5张构成初始手牌，对方不能看见己方的手牌。" },
         }
     },
     {
         title = "回合流程",
         icon = "🃏",
         content = {
-            { type = "text", value = "每局分为三个抽牌阶段：" },
+            { type = "text", value = "每局分为三个抽牌回合：" },
             { type = "gap" },
-            { type = "step", label = "五!", value = "抽5张，弃至多5张" },
-            { type = "step", label = "四!", value = "抽4张，弃至多4张" },
-            { type = "step", label = "三!", value = "抽3张，弃至多3张" },
+            { type = "step", label = "五!", value = "可选至多5张牌丢弃，再抽相同张数" },
+            { type = "step", label = "四!", value = "可选至多4张牌丢弃，再抽相同张数" },
+            { type = "step", label = "三!", value = "可选至多3张牌丢弃，再抽相同张数" },
             { type = "gap" },
-            { type = "text", value = "每阶段先选择要弃置的牌，然后点击「弃置」确认，或点击「跳过」保留所有牌。" },
+            { type = "text", value = "选牌后点「弃置」确认，或点「跳过」保留所有牌。" },
+        }
+    },
+    {
+        title = "结算胜负判定",
+        icon = "⚖️",
+        content = {
+            { type = "text", value = "三个抽牌回合后，双方明牌结算：" },
+            { type = "gap" },
+            { type = "highlight", value = "总点数超过21点即为「爆点」" },
+            { type = "gap" },
+            { type = "text", value = "• 仅一方爆点 → 未爆点方直接获胜" },
+            { type = "text", value = "• 双方均未爆点 → 更接近21点者获胜" },
+            { type = "text", value = "• 双方均爆点 → 更接近21点者获胜\n  （即「爆得少」的赢）" },
+            { type = "text", value = "• 距离相同 → 平局" },
         }
     },
     {
         title = "结算后阶段",
         icon = "✨",
         content = {
-            { type = "text", value = "计分结束后，还有两个特殊阶段：" },
+            { type = "text", value = "结算后进入收尾阶段：" },
             { type = "gap" },
-            { type = "step", label = "二!", value = "选至多2张手牌放回抽牌堆\n(下局可能再抽到)" },
-            { type = "step", label = "一!", value = "选1张手牌保留至下一局\n(下局开始时直接在手中)" },
+            { type = "text", value = "强制处理：若手牌中有鬼牌，将其弃置。" },
             { type = "gap" },
-            { type = "text", value = "善用这两个阶段可以为下一局做准备！" },
+            { type = "step", label = "二!", value = "选至多2张手牌弃置至抽牌堆\n(下局可能再抽到)" },
+            { type = "step", label = "一!", value = "选至多1张手牌保留至下一局\n(下局开始时直接在手中)" },
+            { type = "gap" },
+            { type = "text", value = "下一场对局，双方继承上一局结束时的抽牌堆和弃牌堆。" },
         }
     },
     {
-        title = "特殊牌效果(上)",
+        title = "稀有牌(8-10)",
         icon = "⚡",
         content = {
-            { type = "card", rank = "A", desc = "结算时翻倍对手同花色普通牌" },
-            { type = "card", rank = "7", desc = "不可被其他效果改变或删除" },
-            { type = "card", rank = "8", desc = "结算时己方普通牌各-1点,\n对方普通牌各+2点(可叠加)" },
-            { type = "card", rank = "9", desc = "灵活牌：可视为 0 或 9 点" },
-            { type = "card", rank = "10", desc = "若曾被弃置过，最终得分+1" },
+            { type = "card", rank = "8", desc = "己方普通牌各-2，对方普通牌各+2\n(可叠加)" },
+            { type = "card", rank = "9", desc = "灵活牌：可视为 0 或 9 点\n(自动选择更优值)" },
+            { type = "card", rank = "10", desc = "己方每张稀有牌和罕见牌点数-9\n(可叠加)" },
+            { type = "gap" },
+            { type = "highlight", value = "稀有牌显示紫色光效" },
         }
     },
     {
-        title = "特殊牌效果(下)",
+        title = "罕见牌(J-K) & A",
         icon = "⚡",
         content = {
-            { type = "card", rank = "J", desc = "弃置含J时, 所有补牌可选来源;\n结算时手中有J则对方普通牌×2" },
-            { type = "card", rank = "Q", desc = "使对方最大普通牌点数×2(可叠加)" },
-            { type = "card", rank = "K", desc = "对方点数向上取整到十位\n己方点数向下取整到十位" },
+            { type = "card", rank = "J", desc = "己方所有普通牌点数→0" },
+            { type = "card", rank = "Q", desc = "对方最高普通牌点数×2\n己方点数取至十位(可叠加)" },
+            { type = "card", rank = "K", desc = "对方普通牌和稀有牌点数×2(可叠加)" },
+            { type = "card", rank = "A", desc = "对方同花色牌点数×2(可叠加)" },
             { type = "gap" },
-            { type = "highlight", value = "三张7特殊规则：手持三张7直接获胜！" },
+            { type = "highlight", value = "罕见牌显示金色光效，A显示红色光效" },
         }
     },
     {
@@ -78,17 +94,32 @@ local PAGES = {
         content = {
             { type = "text", value = "鬼牌在抽牌阶段结束后触发效果：" },
             { type = "gap" },
-            { type = "card", rank = "小王", desc = "选择移除对方一张牌(看不到牌面)\n点数自动选择最优(0~13)" },
-            { type = "card", rank = "大王", desc = "选一张手牌设为任意点数(仅当局)\n大王自身也选任意点数(0~13)" },
+            { type = "card", rank = "小王", desc = "选择0~13作为小王自身点数" },
+            { type = "card", rank = "大王", desc = "选一张手牌设为任意点数(0~13)\n大王自身也选任意点数(0~13)\n(仅当局生效)" },
             { type = "gap" },
             { type = "text", value = "鬼牌效果触发后仍保留在手中，以选定点数计入总分。" },
+        }
+    },
+    {
+        title = "结算顺序",
+        icon = "📐",
+        content = {
+            { type = "text", value = "牌效果按以下顺序结算：" },
+            { type = "gap" },
+            { type = "step", label = "1", value = "基础点数(各牌面值之和)" },
+            { type = "step", label = "2", value = "加减效果(8: 己方普通牌-2, 对方+2)" },
+            { type = "step", label = "3", value = "乘算效果(J→0, K×2, A×2)" },
+            { type = "step", label = "4", value = "最终修正(10: 稀有/罕见牌-9)" },
+            { type = "step", label = "5", value = "Q效果(对方最高普通牌×2,\n己方点数取至十位)" },
+            { type = "gap" },
+            { type = "text", value = "9的灵活选择在全部计算后自动优化。" },
         }
     },
     {
         title = "小贴士",
         icon = "💡",
         content = {
-            { type = "text", value = "• 不要一味追求高点数，控制在 21 以内更重要" },
+            { type = "text", value = "• 不要一味追求高点数，控制在21以内更重要" },
             { type = "gap" },
             { type = "text", value = "• 特殊牌是取胜关键，合理利用弃置和保留" },
             { type = "gap" },

@@ -1,7 +1,16 @@
 -- ============================================================================
--- system/RuleEngine.lua - 规则引擎
--- 负责点数计算、7规则判定、胜负判定
--- 新规则: 9(0或9) / 10(对方10使己方+非普通牌数×2) / J(弃置选来源+结算翻倍) / Q(对方最大普通牌×2) / K(取整) / 8(己方普通牌-1,对方普通牌+2)
+-- system/RuleEngine.lua - 规则引擎 (v3)
+-- 新规则:
+--   A: 对方同花色牌点数翻倍(×2)
+--   8: 己方普通牌(2-7)各-2, 对方普通牌各+2
+--   9: 点数可视为0或9(自动优化)
+--   10: 己方稀有牌(8-10)+罕见牌(J/Q/K)各-9点
+--   J: 己方普通牌(2-7)点数全部视为0
+--   Q: 对方点数最高的普通牌×2, 己方最终点数取至十位
+--   K: 对方普通牌(2-7)+稀有牌(8-10)点数×2
+--   小王: 点数0~13
+--   大王: 结算前改一张牌点数, 自身0~13
+--   结算顺序: 基础点 → 加减(8) → 乘算(A,K,J→0) → 最终修正(10,Q)
 -- ============================================================================
 
 local Card = require("core.Card")
@@ -10,164 +19,173 @@ local GameConfig = require("core.GameConfig")
 
 local RuleEngine = {}
 
+--- 获取牌的基础点数(考虑jokerOverride和jokerValue)
+---@param card table
+---@return number
+local function getBasePoints(card)
+    -- 大王覆盖了某张牌的点数
+    if card.jokerOverride then
+        return card.jokerOverride
+    end
+    -- 小王/大王自身选择的点数
+    if card.jokerValue then
+        return card.jokerValue
+    end
+    return Card.GetBasePoints(card)
+end
+
 --- 计算一手牌的最终点数(含特效)
 --- @param hand table[] 自己的手牌
 --- @param opponentHand table[] 对手的手牌
---- @param playerState table|nil PlayerState (用于读取 discardedJackCount)
+--- @param playerState table|nil PlayerState
 --- @param opponentState table|nil 对手的 PlayerState
 --- @return number finalPoints
 --- @return table details
 function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentState)
     local details = {
         basePoints = 0,
-        aceEffects = {},
-        eightEffects = 0,
-        sevenCount = 0,
-        nineFlexSaved = 0,
-        tenBonus = 0,
-        queenTripled = false,
-        kingBonus = 0,
+        aceEffects = {},         -- 被对方A翻倍的花色列表
+        eightEffects = 0,        -- 己方8的数量
+        opponentEightCount = 0,  -- 对方8的数量
+        nineFlexSaved = 0,       -- 9灵活节省的点数
+        tenReduce = 0,           -- 10效果减少的点数
+        jackActive = false,      -- J效果是否生效
+        queenTriple = 0,         -- Q效果对对方的加成
+        queenFloor = false,      -- Q效果使己方取整
+        kingActive = false,      -- K效果是否生效
         finalPoints = 0,
-        opponentJackCount = 0,
-        cardBreakdown = {},  -- 每张牌的计算过程 {name, base, effects={}, final}
+        cardBreakdown = {},      -- 每张牌的计算过程 {name, base, effects={}, final}
     }
 
     -- =======================================================================
-    -- 0. J 效果: 弃置时选择补牌来源 + 结算时手牌中有J则对方普通牌×2
+    -- Step 1: 收集各效果触发情况 (nullified 的牌不触发效果)
     -- =======================================================================
-    local opponentJackCount = 0
-    for _, card in ipairs(opponentHand) do
-        if card.rank == 11 then
-            opponentJackCount = opponentJackCount + 1
-        end
-    end
-    details.opponentJackCount = opponentJackCount
 
-    -- =======================================================================
-    -- 1. 对方 Q 效果: 每张Q使我方手牌中点数最大的一张普通牌(2-6)点数×2
-    --    多张Q可叠加, 每次翻倍当前点数最大的普通牌
-    -- =======================================================================
-    local queenDoubleMap = {}  -- idx -> 翻倍次数
-    local opponentQueenCount = 0
-    for _, card in ipairs(opponentHand) do
-        if card.rank == 12 then
-            opponentQueenCount = opponentQueenCount + 1
-        end
-    end
-    -- 用临时数组追踪每张普通牌的当前有效点数(被Q翻倍后的)
-    local tempNormalPts = {}
-    for i, card in ipairs(hand) do
-        if Card.IsNormal(card) then
-            tempNormalPts[i] = Card.GetBasePoints(card)
-        end
-    end
-    for _ = 1, opponentQueenCount do
-        -- 每张Q找当前点数最大的普通牌翻倍
-        local maxPts = -1
-        local maxIdx = nil
-        for idx, pts in pairs(tempNormalPts) do
-            if pts > maxPts then
-                maxPts = pts
-                maxIdx = idx
-            end
-        end
-        if maxIdx then
-            tempNormalPts[maxIdx] = tempNormalPts[maxIdx] * 2
-            queenDoubleMap[maxIdx] = (queenDoubleMap[maxIdx] or 0) + 1
-        end
-    end
-    if opponentQueenCount > 0 and next(queenDoubleMap) then
-        details.queenTripled = true  -- 复用字段名表示Q效果生效
-        details.queenDoubleMap = queenDoubleMap
-        details.queenCount = opponentQueenCount
-    end
-
-    -- =======================================================================
-    -- 2. 收集对手的 Ace 花色 (翻倍我方同花色)
-    -- =======================================================================
+    -- 对手的 Ace 花色 (翻倍我方同花色牌)
     local aceDoubledSuits = {}
     for _, card in ipairs(opponentHand) do
-        if card.rank == 1 then
-            aceDoubledSuits[card.suit] = true
+        if card.rank == 1 and not card.nullified then
+            aceDoubledSuits[card.suit] = (aceDoubledSuits[card.suit] or 0) + 1
             table.insert(details.aceEffects, card.suit)
         end
     end
 
-    -- =======================================================================
-    -- 3. 统计8的数量: 己方8降低己方普通牌1点, 对方8提升己方普通牌2点
-    -- =======================================================================
+    -- 己方8数量 (己方普通牌各-2)
     local myEightCount = 0
     for _, card in ipairs(hand) do
-        if card.rank == 8 then
+        if card.rank == 8 and not card.nullified then
             myEightCount = myEightCount + 1
         end
     end
+    -- 对方8数量 (己方普通牌各+2)
     local opponentEightCount = 0
     for _, card in ipairs(opponentHand) do
-        if card.rank == 8 then
+        if card.rank == 8 and not card.nullified then
             opponentEightCount = opponentEightCount + 1
         end
     end
     details.eightEffects = myEightCount
     details.opponentEightCount = opponentEightCount
 
+    -- 己方J数量 (己方普通牌→0)
+    local myJackCount = 0
+    for _, card in ipairs(hand) do
+        if card.rank == 11 and not card.nullified then
+            myJackCount = myJackCount + 1
+        end
+    end
+    if myJackCount > 0 then
+        details.jackActive = true
+    end
+
+    -- 对方K数量 (己方普通牌+稀有牌×2)
+    local opponentKingCount = 0
+    for _, card in ipairs(opponentHand) do
+        if card.rank == 13 and not card.nullified then
+            opponentKingCount = opponentKingCount + 1
+        end
+    end
+    if opponentKingCount > 0 then
+        details.kingActive = true
+    end
+
+    -- 己方10数量 (己方稀有牌+罕见牌各-9)
+    local myTenCount = 0
+    for _, card in ipairs(hand) do
+        if card.rank == 10 and not card.nullified then
+            myTenCount = myTenCount + 1
+        end
+    end
+
     -- =======================================================================
-    -- 4. 逐张计算点数
+    -- Step 2: 逐张计算点数 (按结算顺序: 基础 → 加减8 → 乘算A/K/J→0 → 最终修正10)
     -- =======================================================================
     local totalPoints = 0
+
     for i, card in ipairs(hand) do
-        local basePoints = Card.GetBasePoints(card)
+        local basePoints = getBasePoints(card)
         local points = basePoints
         local breakdown = { name = Card.GetName(card), base = basePoints, effects = {}, final = 0 }
+        local isNormal = Card.IsNormal(card)
+        local isFace = Card.IsFace(card)
 
-        -- 9 的灵活选择: 可视为0或9, 根据接近21最优化选择
-        -- (先按 9 计算, 后续再优化)
-        if card.rank == 9 then
-            -- 暂时保持原值, 后面做全局优化
-        end
-
-        -- 7 不可被改变点数, 跳过其他效果
-        if card.rank == 7 then
-            totalPoints = totalPoints + points
+        -- nullified 的牌: 只算基础点数, 不参与任何效果加成
+        if card.nullified then
             breakdown.final = points
             table.insert(details.cardBreakdown, breakdown)
+            totalPoints = totalPoints + points
             goto continue
         end
 
-        -- Q 效果: 被对方Q影响的普通牌, 每张Q翻倍一次
-        if queenDoubleMap[i] then
-            for _ = 1, queenDoubleMap[i] do
-                points = points * 2
-            end
-            table.insert(breakdown.effects, string.format("Q×%d", queenDoubleMap[i]))
-        end
-
-        -- J 效果: 对方手牌中每有一张J, 己方普通牌(2~6)点数×2
-        if Card.IsNormal(card) and opponentJackCount > 0 then
-            for _ = 1, opponentJackCount do
-                points = points * 2
-            end
-            table.insert(breakdown.effects, string.format("J×%d", opponentJackCount))
-        end
-
-        -- Ace 翻倍效果
-        if card.suit and aceDoubledSuits[card.suit] then
-            points = points * 2
-            table.insert(breakdown.effects, "A×2")
-        end
-
-        -- 8 效果: 己方每张8使己方普通牌-1; 对方每张8使己方普通牌+2
-        if Card.IsNormal(card) and (myEightCount > 0 or opponentEightCount > 0) then
-            local delta = -myEightCount + opponentEightCount * 2
+        -- ----- Step 2b: 加减效果 (8) -----
+        -- 8 对普通牌(2-7)的加减: 己方每张8使-2, 对方每张8使+2
+        if isNormal and (myEightCount > 0 or opponentEightCount > 0) then
+            local delta = -myEightCount * 2 + opponentEightCount * 2
             points = math.max(0, points + delta)
             local parts = {}
             if myEightCount > 0 then
-                table.insert(parts, string.format("己8(-%d)", myEightCount))
+                table.insert(parts, string.format("己8(-%d)", myEightCount * 2))
             end
             if opponentEightCount > 0 then
                 table.insert(parts, string.format("对8(+%d)", opponentEightCount * 2))
             end
             table.insert(breakdown.effects, table.concat(parts, ","))
+        end
+
+        -- ----- Step 2c: 乘算效果 (A, K, J→0) -----
+        -- J 效果: 己方有J时, 己方普通牌(2-7)点数全部视为0
+        if isNormal and myJackCount > 0 then
+            points = 0
+            table.insert(breakdown.effects, "J→0")
+        end
+
+        -- K 效果 (对方K使己方普通牌+稀有牌×2, 叠加多张K)
+        local isNormalOrRare = isNormal or (card.rank >= 8 and card.rank <= 10)
+        if isNormalOrRare and opponentKingCount > 0 then
+            for _ = 1, opponentKingCount do
+                points = points * 2
+            end
+            table.insert(breakdown.effects, string.format("K×%d", 2 ^ opponentKingCount))
+        end
+
+        -- A 翻倍效果: 对方A使己方同花色牌点数翻倍
+        if card.suit and aceDoubledSuits[card.suit] then
+            local aceCount = aceDoubledSuits[card.suit]
+            for _ = 1, aceCount do
+                points = points * 2
+            end
+            table.insert(breakdown.effects, string.format("A×%d", 2 ^ aceCount))
+        end
+
+        -- ----- Step 2d: 最终修正 (10: 己方稀有牌+罕见牌-9) -----
+        -- 10 效果: 己方每张10使己方稀有牌(8-10)和罕见牌(J/Q/K)各-9
+        local isRareOrFace = (card.rank >= 8 and card.rank <= 10) or isFace
+        if isRareOrFace and myTenCount > 0 then
+            local reduce = myTenCount * 9
+            points = points - reduce
+            -- 可以为负数
+            table.insert(breakdown.effects, string.format("10(-%d)", reduce))
+            details.tenReduce = details.tenReduce + reduce
         end
 
         breakdown.final = points
@@ -177,100 +195,31 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
     end
 
     -- =======================================================================
-    -- 5. 9 的灵活选择优化: 如果总点 > 21, 尝试把 9 变为 0
+    -- Step 3: 9 的灵活选择优化: 如果总点 > 21, 尝试把 9 变为 0
     -- =======================================================================
     if totalPoints > GameConfig.TARGET_POINTS then
         for i, card in ipairs(hand) do
-            if card.rank == 9 then
-                -- 当前 9 贡献了多少点? 重新计算
-                local nineContribution = 9
-                -- 应用可能的翻倍效果
-                if card.suit and aceDoubledSuits[card.suit] then
-                    nineContribution = nineContribution * 2
-                end
-                -- 如果变为 0 能让结果更接近 21
-                local withoutNine = totalPoints - nineContribution
-                if math.abs(withoutNine - GameConfig.TARGET_POINTS) < math.abs(totalPoints - GameConfig.TARGET_POINTS) then
-                    totalPoints = withoutNine
-                    details.nineFlexSaved = details.nineFlexSaved + nineContribution
-                    -- 更新breakdown
-                    if details.cardBreakdown[i] then
-                        details.cardBreakdown[i].final = 0
-                        table.insert(details.cardBreakdown[i].effects, "灵活→0")
+            if card.rank == 9 and not card.nullified then
+                -- 当前 9 贡献了多少点
+                local nineContribution = details.cardBreakdown[i] and details.cardBreakdown[i].final or 9
+                if nineContribution > 0 then
+                    local withoutNine = totalPoints - nineContribution
+                    if math.abs(withoutNine - GameConfig.TARGET_POINTS) < math.abs(totalPoints - GameConfig.TARGET_POINTS) then
+                        totalPoints = withoutNine
+                        details.nineFlexSaved = details.nineFlexSaved + nineContribution
+                        if details.cardBreakdown[i] then
+                            details.cardBreakdown[i].final = 0
+                            table.insert(details.cardBreakdown[i].effects, "灵活→0")
+                        end
                     end
                 end
             end
         end
     end
 
-    -- =======================================================================
-    -- 6. K 效果: 在 Settle 中统一处理(对方取整+自己-5取整)
-    -- =======================================================================
-    local kingCount = 0
-    for _, card in ipairs(hand) do
-        if card.rank == 13 then
-            kingCount = kingCount + 1
-        end
-    end
-    details.kingCount = kingCount
-
-    -- =======================================================================
-    -- 7. 10 效果: 对方每张10使己方点数 + (己方非普通牌数量 × 2)
-    -- =======================================================================
-    local opponentTenCount = 0
-    for _, card in ipairs(opponentHand) do
-        if card.rank == 10 then
-            opponentTenCount = opponentTenCount + 1
-        end
-    end
-    local tenBonus = 0
-    if opponentTenCount > 0 then
-        local myNonNormalCount = 0
-        for _, card in ipairs(hand) do
-            if not Card.IsNormal(card) then
-                myNonNormalCount = myNonNormalCount + 1
-            end
-        end
-        tenBonus = myNonNormalCount * 2 * opponentTenCount
-    end
-    totalPoints = totalPoints + tenBonus
-    details.tenBonus = tenBonus
-    details.opponentTenCount = opponentTenCount
-
     details.basePoints = totalPoints
     details.finalPoints = totalPoints
     return totalPoints, details
-end
-
---- 检查7的特殊胜利条件
----@param hand table[]
----@param opponentHand table[]
----@return string|nil "win" / "lose" / nil
-function RuleEngine.CheckSevenRule(hand, opponentHand)
-    local mySevenCount = 0
-    for _, card in ipairs(hand) do
-        if Card.CanCountAsSeven(card) then
-            mySevenCount = mySevenCount + 1
-        end
-    end
-
-    if mySevenCount < 3 then return nil end
-
-    -- 有3张7，检查对方是否有可视为7的牌
-    local opponentSevenCount = 0
-    for _, card in ipairs(opponentHand) do
-        if Card.CanCountAsSeven(card) then
-            opponentSevenCount = opponentSevenCount + 1
-        end
-    end
-
-    if opponentSevenCount == 0 then
-        return "win"   -- 对方无7，胜利
-    elseif opponentSevenCount >= 2 then
-        return "lose"  -- 对方有2+张7，失败
-    end
-
-    return nil  -- 对方有1张7，无特殊效果
 end
 
 --- 执行结算判定
@@ -286,62 +235,97 @@ function RuleEngine.Settle(playerHand, aiHand, playerState, aiState)
         aiPoints = 0,
         playerDetails = nil,
         aiDetails = nil,
-        sevenRuleTriggered = false,
     }
 
-    -- 先检查7特殊规则
-    local playerSeven = RuleEngine.CheckSevenRule(playerHand, aiHand)
-    local aiSeven = RuleEngine.CheckSevenRule(aiHand, playerHand)
+    -- 正常结算
+    local playerPts, playerDetails = RuleEngine.CalculatePoints(playerHand, aiHand, playerState, aiState)
+    local aiPts, aiDetails = RuleEngine.CalculatePoints(aiHand, playerHand, aiState, playerState)
 
-    if playerSeven == "win" and aiSeven == "win" then
-        result.winner = "tie"
-        result.sevenRuleTriggered = true
-    elseif playerSeven == "win" then
-        result.winner = "player"
-        result.sevenRuleTriggered = true
-    elseif playerSeven == "lose" then
-        result.winner = "ai"
-        result.sevenRuleTriggered = true
-    elseif aiSeven == "win" then
-        result.winner = "ai"
-        result.sevenRuleTriggered = true
-    elseif aiSeven == "lose" then
-        result.winner = "player"
-        result.sevenRuleTriggered = true
+    -- =======================================================================
+    -- Q 效果 (在Settle中处理, 因为涉及双方最终点数的交叉影响)
+    -- Q: 对方点数最高的一张普通牌×3, 己方最终点数向下取整
+    -- =======================================================================
+    local playerQueenCount = 0
+    for _, card in ipairs(playerHand) do
+        if card.rank == 12 and not card.nullified then playerQueenCount = playerQueenCount + 1 end
+    end
+    local aiQueenCount = 0
+    for _, card in ipairs(aiHand) do
+        if card.rank == 12 and not card.nullified then aiQueenCount = aiQueenCount + 1 end
     end
 
-    if not result.sevenRuleTriggered then
-        -- 正常结算: 比较谁更接近21
-        local playerPts, playerDetails = RuleEngine.CalculatePoints(playerHand, aiHand, playerState, aiState)
-        local aiPts, aiDetails = RuleEngine.CalculatePoints(aiHand, playerHand, aiState, playerState)
-
-        -- K 效果: 持有K时，对方点数向上取整到十位，自己点数向下取整到十位
-        local playerKings = playerDetails.kingCount or 0
-        local aiKings = aiDetails.kingCount or 0
-
-        local function ceilToTen(n)
-            return math.ceil(n / 10) * 10
+    -- 玩家Q效果: 对方(AI)点数最高的普通牌×2, 己方点数取至十位
+    if playerQueenCount > 0 then
+        -- 找AI手牌中点数最高的普通牌的当前最终点数
+        local maxNormalPts = 0
+        local maxNormalIdx = nil
+        for i, card in ipairs(aiHand) do
+            if Card.IsNormal(card) and not card.nullified then
+                local cardFinal = aiDetails.cardBreakdown[i] and aiDetails.cardBreakdown[i].final or 0
+                if cardFinal > maxNormalPts then
+                    maxNormalPts = cardFinal
+                    maxNormalIdx = i
+                end
+            end
         end
-        local function floorToTen(n)
-            return math.floor(n / 10) * 10
+        if maxNormalIdx and maxNormalPts > 0 then
+            -- ×2 意味着额外增加 (2-1)*点数 = 1倍的点数
+            local queenBonus = maxNormalPts * 1 * playerQueenCount
+            aiPts = aiPts + queenBonus
+            playerDetails.queenTriple = queenBonus
+            -- 更新AI breakdown
+            if aiDetails.cardBreakdown[maxNormalIdx] then
+                aiDetails.cardBreakdown[maxNormalIdx].final = aiDetails.cardBreakdown[maxNormalIdx].final + queenBonus
+                table.insert(aiDetails.cardBreakdown[maxNormalIdx].effects, string.format("Q×2(+%d)", queenBonus))
+            end
         end
+        -- 取至十位: 向下取整到最近的10的倍数
+        playerPts = math.floor(playerPts / 10) * 10
+        playerDetails.queenFloor = true
+    end
 
-        if playerKings > 0 then
-            aiPts = ceilToTen(aiPts)         -- 对方向上取整到十位
-            playerPts = floorToTen(playerPts) -- 自己向下取整到十位
-            playerDetails.kingApplied = true
+    -- AI的Q效果: 对方(玩家)点数最高的普通牌×2, AI点数取至十位
+    if aiQueenCount > 0 then
+        local maxNormalPts = 0
+        local maxNormalIdx = nil
+        for i, card in ipairs(playerHand) do
+            if Card.IsNormal(card) and not card.nullified then
+                local cardFinal = playerDetails.cardBreakdown[i] and playerDetails.cardBreakdown[i].final or 0
+                if cardFinal > maxNormalPts then
+                    maxNormalPts = cardFinal
+                    maxNormalIdx = i
+                end
+            end
         end
-        if aiKings > 0 then
-            playerPts = ceilToTen(playerPts)  -- 对方向上取整到十位
-            aiPts = floorToTen(aiPts)         -- 自己向下取整到十位
-            aiDetails.kingApplied = true
+        if maxNormalIdx and maxNormalPts > 0 then
+            local queenBonus = maxNormalPts * 1 * aiQueenCount
+            playerPts = playerPts + queenBonus
+            aiDetails.queenTriple = queenBonus
+            if playerDetails.cardBreakdown[maxNormalIdx] then
+                playerDetails.cardBreakdown[maxNormalIdx].final = playerDetails.cardBreakdown[maxNormalIdx].final + queenBonus
+                table.insert(playerDetails.cardBreakdown[maxNormalIdx].effects, string.format("Q×2(+%d)", queenBonus))
+            end
         end
+        -- 取至十位: 向下取整到最近的10的倍数
+        aiPts = math.floor(aiPts / 10) * 10
+        aiDetails.queenFloor = true
+    end
 
-        result.playerPoints = playerPts
-        result.aiPoints = aiPts
-        result.playerDetails = playerDetails
-        result.aiDetails = aiDetails
+    result.playerPoints = playerPts
+    result.aiPoints = aiPts
+    result.playerDetails = playerDetails
+    result.aiDetails = aiDetails
 
+    -- 胜负判定: 超21爆牌优先
+    local playerOver = playerPts > GameConfig.TARGET_POINTS
+    local aiOver = aiPts > GameConfig.TARGET_POINTS
+
+    if playerOver and not aiOver then
+        result.winner = "ai"
+    elseif aiOver and not playerOver then
+        result.winner = "player"
+    else
+        -- 双方都没爆 或 双方都爆了 → 比较谁更接近21
         local playerDist = math.abs(GameConfig.TARGET_POINTS - playerPts)
         local aiDist = math.abs(GameConfig.TARGET_POINTS - aiPts)
 

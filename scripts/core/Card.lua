@@ -11,10 +11,8 @@ local Card = {}
 ---@return string category
 local function getCategory(rank)
     if rank == 1 then return Constant.CATEGORY.ACE
-    elseif rank >= 2 and rank <= 6 then return Constant.CATEGORY.NORMAL
-    elseif rank == 7 then return Constant.CATEGORY.SEVEN
-    elseif rank == 8 then return Constant.CATEGORY.EIGHT
-    elseif rank >= 9 and rank <= 10 then return Constant.CATEGORY.RARE
+    elseif rank >= 2 and rank <= 7 then return Constant.CATEGORY.NORMAL
+    elseif rank >= 8 and rank <= 10 then return Constant.CATEGORY.RARE
     elseif rank >= 11 and rank <= 13 then return Constant.CATEGORY.FACE
     elseif rank >= 14 then return Constant.CATEGORY.JOKER
     end
@@ -30,13 +28,12 @@ local function getEffectId(rank, isJoker)
         return rank == 14 and Constant.EFFECT.JOKER_SMALL or Constant.EFFECT.JOKER_BIG
     end
     if rank == 1 then return Constant.EFFECT.ACE_DOUBLE end
-    if rank == 7 then return Constant.EFFECT.SEVEN_IMMUNE end
     if rank == 8 then return Constant.EFFECT.EIGHT_REDUCE end
     if rank == 9 then return Constant.EFFECT.NINE_FLEX end
-    if rank == 10 then return Constant.EFFECT.TEN_BONUS end
-    if rank == 11 then return Constant.EFFECT.JACK_DRAW end
+    if rank == 10 then return Constant.EFFECT.TEN_REDUCE end
+    if rank == 11 then return Constant.EFFECT.JACK_ZERO end
     if rank == 12 then return Constant.EFFECT.QUEEN_TRIPLE end
-    if rank == 13 then return Constant.EFFECT.KING_BONUS end
+    if rank == 13 then return Constant.EFFECT.KING_DOUBLE end
     return Constant.EFFECT.NONE
 end
 
@@ -90,20 +87,18 @@ function Card.IsJoker(card)
     return card.category == Constant.CATEGORY.JOKER
 end
 
---- 是否为普通牌(2-6)
+--- 是否为普通牌(2-7)
 ---@param card table
 ---@return boolean
 function Card.IsNormal(card)
     return card.category == Constant.CATEGORY.NORMAL
 end
 
---- 是否可以视为7(7本身 + 大王选为7时)
+--- 是否为罕见牌(J/Q/K, rank 11-13)
 ---@param card table
 ---@return boolean
-function Card.CanCountAsSeven(card)
-    if card.rank == 7 then return true end
-    if card.rank == 15 and card.jokerValue == 7 then return true end
-    return false
+function Card.IsFace(card)
+    return card.category == Constant.CATEGORY.FACE
 end
 
 return Card

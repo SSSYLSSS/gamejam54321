@@ -192,15 +192,10 @@ local function ProcessPlayerDiscard(playerId, discardIndices)
     table.sort(discardIndices, function(a, b) return a > b end)
 
     local discarded = {}
-    local jackCount = 0
     for _, idx in ipairs(discardIndices) do
         local card = playerState:RemoveFromHand(idx)
         if card then
             table.insert(discarded, card)
-            if card.rank == 11 then
-                jackCount = jackCount + 1
-            end
-
         end
     end
 
@@ -209,43 +204,19 @@ local function ProcessPlayerDiscard(playerId, discardIndices)
         playerState:AddToDiscard(card)
     end
 
-    -- 追踪J弃牌数
-    playerState.discardedJackCount = playerState.discardedJackCount + jackCount
-
-    -- J效果: 弃置含J → 所有补牌从弃牌堆/抽牌堆智能选择(服务端自动决策)
+    -- 正常从抽牌堆补牌
     local drawn = {}
-    if jackCount > 0 then
-        playerState.pendingJackPicks = #discarded
-        while playerState.pendingJackPicks > 0 do
-            local card
-            -- 服务端策略: 优先从弃牌堆拿
-            if playerState:GetDiscardCount() > 0 then
-                card = playerState:DrawRandomFromDiscard()
-            elseif #playerState.deck > 0 then
-                card = DeckSystem.Draw(playerState.deck, round)
-            end
-            if card then
-                playerState:AddToHand(card)
-                table.insert(drawn, card)
-            end
-            playerState.pendingJackPicks = playerState.pendingJackPicks - 1
-        end
-    else
-        -- 无J: 正常从抽牌堆补牌
-        playerState.pendingJackPicks = 0
-        for _ = 1, #discarded do
-            local card = DeckSystem.Draw(playerState.deck, round)
-            if card then
-                playerState:AddToHand(card)
-                table.insert(drawn, card)
-            end
+    for _ = 1, #discarded do
+        local card = DeckSystem.Draw(playerState.deck, round)
+        if card then
+            playerState:AddToHand(card)
+            table.insert(drawn, card)
         end
     end
 
     return {
         discarded = discarded,
         drawn = drawn,
-        jackCount = jackCount,
     }
 end
 
@@ -255,7 +226,7 @@ ResolveTurn = function()
     for i = 1, 2 do
         local action = pendingActions_[i]
         if action.skip then
-            results[i] = { discarded = {}, drawn = {}, jackCount = 0 }
+            results[i] = { discarded = {}, drawn = {} }
         else
             results[i] = ProcessPlayerDiscard(i, action.indices)
         end
@@ -274,10 +245,10 @@ ResolveTurn = function()
         Shared.EncodeHand(data, "Hand", p.state.hand)
         -- 自己的弃牌信息
         data["MyDiscardCount"] = Variant(#myResult.discarded)
-        data["MyJackCount"] = Variant(myResult.jackCount)
+
         -- 对手弃牌数
         data["OppDiscardCount"] = Variant(#oppResult.discarded)
-        data["OppJackCount"] = Variant(oppResult.jackCount)
+
         data["OppHandSize"] = Variant(#opp.state.hand)
         -- 牌堆信息
         data["DeckCount"] = Variant(#p.state.deck)
@@ -304,10 +275,6 @@ DoSettlement = function()
     EffectSystem.AutoSetJokerValues(p1.state.hand)
     EffectSystem.AutoSetJokerValues(p2.state.hand)
 
-    -- 小王效果: 互相移除
-    local removedByP1 = EffectSystem.SmallJokerEffect(p1.state.hand, p2.state.hand, p2.state)
-    local removedByP2 = EffectSystem.SmallJokerEffect(p2.state.hand, p1.state.hand, p1.state)
-
     -- 执行 RuleEngine 结算
     local result = RuleEngine.Settle(p1.state.hand, p2.state.hand, p1.state, p2.state)
 
@@ -326,16 +293,8 @@ DoSettlement = function()
         data["P1Points"] = Variant(result.playerPoints)
         data["P2Points"] = Variant(result.aiPoints)
         data["Winner"] = Variant(result.winner == "player" and 1 or (result.winner == "ai" and 2 or 0))
-        data["SevenRule"] = Variant(result.sevenRuleTriggered and 1 or 0)
         data["P1Wins"] = Variant(gameState_.p1Wins)
         data["P2Wins"] = Variant(gameState_.p2Wins)
-        -- 小王效果信息
-        if removedByP1 then
-            data["P1RemovedCard"] = Variant(Shared.EncodeCard(removedByP1))
-        end
-        if removedByP2 then
-            data["P2RemovedCard"] = Variant(Shared.EncodeCard(removedByP2))
-        end
         SendToPlayer(i, Shared.EVENTS.SETTLEMENT_RESULT, data)
     end
 
@@ -627,7 +586,7 @@ function Server.Start()
     network:RegisterRemoteEvent(Shared.EVENTS.CLIENT_READY)
     network:RegisterRemoteEvent(Shared.EVENTS.PLAYER_DISCARD)
     network:RegisterRemoteEvent(Shared.EVENTS.PLAYER_SKIP)
-    network:RegisterRemoteEvent(Shared.EVENTS.PLAYER_JACK_PICK)
+
     network:RegisterRemoteEvent(Shared.EVENTS.PLAYER_POST_DISCARD)
     network:RegisterRemoteEvent(Shared.EVENTS.PLAYER_POST_KEEP)
     network:RegisterRemoteEvent(Shared.EVENTS.PLAYER_CONTINUE)

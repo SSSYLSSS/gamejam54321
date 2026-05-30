@@ -20,9 +20,7 @@ local function serializePlayerState(playerState)
         deck = playerState.deck,
         discardPile = playerState.discardPile,
         keepCard = playerState.keepCard,
-        pendingJackPicks = playerState.pendingJackPicks,
 
-        discardedJackCount = playerState.discardedJackCount,
     }
 end
 
@@ -124,9 +122,7 @@ function SaveSystem.RestoreGameState(saveData, GameState, PlayerState, RoundStat
         gs.player.deck = saveData.player.deck or {}
         gs.player.discardPile = saveData.player.discardPile or {}
         gs.player.keepCard = saveData.player.keepCard
-        gs.player.pendingJackPicks = saveData.player.pendingJackPicks or 0
 
-        gs.player.discardedJackCount = saveData.player.discardedJackCount or 0
     end
 
     -- 恢复AI状态
@@ -135,9 +131,7 @@ function SaveSystem.RestoreGameState(saveData, GameState, PlayerState, RoundStat
         gs.ai.deck = saveData.ai.deck or {}
         gs.ai.discardPile = saveData.ai.discardPile or {}
         gs.ai.keepCard = saveData.ai.keepCard
-        gs.ai.pendingJackPicks = saveData.ai.pendingJackPicks or 0
 
-        gs.ai.discardedJackCount = saveData.ai.discardedJackCount or 0
     end
 
     -- 恢复回合状态

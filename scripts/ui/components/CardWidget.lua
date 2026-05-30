@@ -42,52 +42,52 @@ local function getCardEffectText(card)
     if not card then return nil end
     if Card.IsJoker(card) then
         if card.rank == 14 then
-            return "小王: 点数可选0~13, 移除对方一张牌"
+            return "小王: 点数可选0~13"
         else
-            return "大王: 选一张手牌设为任意点数(仅当局有效), 大王自身也选任意点数"
+            return "大王: 结算前选一张手牌改为任意点数(0~13), 大王自身也选任意点数"
         end
     end
     local rank = card.rank
-    if rank == 1 then return "A: 结算时翻倍对方同花色牌点数" end
-    if rank == 7 then return "7: 不可被改变点数/删除, 3张7触发特殊胜负" end
-    if rank == 8 then return "8: 结算时己方普通牌各-1点, 对方普通牌各+2点(可叠加)" end
-    if rank == 9 then return "9: 结算时点数可视为0或9" end
-    if rank == 10 then return "10(10点): 若弃置过此牌, 最终点数+1" end
-    if rank == 11 then return "J(11点): 弃置含J时, 所有补牌可逐张选择来源; 结算时手中有J则对方普通牌×2" end
-    if rank == 12 then return "Q(12点): 结算时使对方最大普通牌点数×2(可叠加)" end
-    if rank == 13 then return "K: 结算时对方点数向上取整到十位, 己方点数向下取整到十位" end
-    if rank >= 2 and rank <= 6 then
+    if rank == 1 then return "A(1点): 结算时翻倍对方同花色牌点数(×2)" end
+    if rank == 8 then return "8(8点): 结算时己方普通牌(2-7)各-2点, 对方普通牌各+2点" end
+    if rank == 9 then return "9(9点): 结算时点数可视为0或9(自动优化)" end
+    if rank == 10 then return "10(10点): 结算时己方稀有牌和罕见牌各-9点" end
+    if rank == 11 then return "J(11点): 结算时己方所有普通牌(2-7)点数视为0" end
+    if rank == 12 then return "Q(12点): 对方点数最高的普通牌×2, 己方点数取至十位" end
+    if rank == 13 then return "K(13点): 结算时对方普通牌和稀有牌点数×2" end
+    if rank >= 2 and rank <= 7 then
         return string.format("%d: 普通牌, %d点", rank, rank)
     end
     return nil
 end
 
 --- 获取卡牌光晕颜色和大小 (用于 shadowColor / shadowBlur)
+--- 新分类: 鬼牌=红色, A=金色, J-K(罕见)=金色, 8-10(稀有)=紫色, 2-7(普通)=无
 ---@param card table|nil
 ---@return table|nil glowColor {r, g, b, a}
 ---@return number baseBlur 光晕模糊半径
 local function getGlowColor(card)
     if not card then return nil, 0 end
-    -- 鬼牌: 暗金色, 最大光晕
-    if Card.IsJoker(card) then return { 180, 150, 50, 220 }, 120 end
-    -- A: 金色, 第二大光晕
-    if card.rank == 1 then return { 255, 210, 60, 200 }, 100 end
-    -- J~K: 紫色, 第三大光晕
-    if card.rank == 11 then return { 160, 80, 255, 220 }, 70 end
-    if card.rank == 12 then return { 160, 80, 255, 220 }, 70 end
-    if card.rank == 13 then return { 160, 80, 255, 220 }, 70 end
-    -- 8~10: 蓝色
-    if card.rank == 8 then return { 100, 180, 255, 180 }, 50 end
-    if card.rank == 9 then return { 100, 180, 255, 180 }, 50 end
-    if card.rank == 10 then return { 100, 180, 255, 180 }, 50 end
-    -- 7: 绿色
-    if card.rank == 7 then return { 60, 255, 120, 200 }, 50 end
+    -- 鬼牌: 红金色, 最大光晕
+    if Card.IsJoker(card) then return { 255, 100, 30, 230 }, 120 end
+    -- A: 红色, 第二大光晕
+    if card.rank == 1 then return { 255, 50, 50, 210 }, 100 end
+    -- J~K(罕见牌): 金色, 第三大光晕
+    if card.rank == 11 then return { 255, 200, 50, 200 }, 80 end
+    if card.rank == 12 then return { 255, 200, 50, 200 }, 80 end
+    if card.rank == 13 then return { 255, 200, 50, 200 }, 80 end
+    -- 8~10(稀有牌): 紫色
+    if card.rank == 8 then return { 160, 80, 255, 200 }, 60 end
+    if card.rank == 9 then return { 160, 80, 255, 200 }, 60 end
+    if card.rank == 10 then return { 160, 80, 255, 200 }, 60 end
+    -- 2~7(普通牌): 无光晕
     return nil, 0
 end
 
 --- 创建一个卡牌 UI 组件
 ---@param card table|nil 卡牌数据(nil 表示牌背)
----@param opts table 选项 {selected, selectable, onClick, isAI}
+---@param opts table 选项 {selected, selectable, onClick, isAI, glowCard}
+---   glowCard: 用于牌背面时显示光效的卡牌数据(不显示牌面, 仅显示光晕)
 ---@return table widget
 function CardWidget.Create(card, opts)
     opts = opts or {}
@@ -95,6 +95,8 @@ function CardWidget.Create(card, opts)
     local selectable = opts.selectable or false
     local isAI = opts.isAI or false
     local isSmall = opts.small or false
+    -- glowCard: 如果牌面不可见(card=nil)但要显示光效, 传入此参数
+    local glowCard = opts.glowCard or card
 
     local w = isAI and AI_CARD_WIDTH or (isSmall and 150 or CARD_WIDTH)
     local h = isAI and AI_CARD_HEIGHT or (isSmall and 210 or CARD_HEIGHT)
@@ -108,8 +110,8 @@ function CardWidget.Create(card, opts)
     local rankFontSize = isAI and 28 or (isSmall and 38 or 54)
     local suitFontSize = isAI and 44 or (isSmall and 60 or 84)
 
-    -- 卡牌光晕 (加大范围使其更醒目)
-    local glowColor, glowBaseBlur = getGlowColor(card)
+    -- 卡牌光晕 (加大范围使其更醒目) - 使用 glowCard 以支持牌背光效
+    local glowColor, glowBaseBlur = getGlowColor(glowCard)
     local shadowBlur = glowColor and (isAI and math.floor(glowBaseBlur * 0.6) or glowBaseBlur) or 0
 
     local cardContent

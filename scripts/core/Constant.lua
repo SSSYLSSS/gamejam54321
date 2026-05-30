@@ -60,34 +60,31 @@ Constant.RANK_NAMES = {
 -- 卡牌类别
 Constant.CATEGORY = {
     ACE     = "ace",        -- A (1)
-    NORMAL  = "normal",     -- 2-6
-    SEVEN   = "seven",      -- 7
-    EIGHT   = "eight",      -- 8
-    RARE    = "rare",       -- 9-10
-    FACE    = "face",       -- J, Q, K
+    NORMAL  = "normal",     -- 2-7
+    RARE    = "rare",       -- 8-10 (稀有牌)
+    FACE    = "face",       -- J, Q, K (罕见牌)
     JOKER   = "joker",      -- 小王, 大王
 }
 
 -- 卡牌效果ID
 Constant.EFFECT = {
     NONE            = "none",
-    ACE_DOUBLE      = "ace_double",       -- A: 翻倍对手同花色
-    SEVEN_IMMUNE    = "seven_immune",     -- 7: 不可被改变点数/删除, 可弃置
-    EIGHT_REDUCE    = "eight_reduce",     -- 8: 己方普通牌-1, 对方普通牌+2
+    ACE_DOUBLE      = "ace_double",       -- A: 翻倍对手同花色牌点数(×2)
+    EIGHT_REDUCE    = "eight_reduce",     -- 8: 己方普通牌-2, 对方普通牌+2
     NINE_FLEX       = "nine_flex",        -- 9: 点数可视为0或9
-    TEN_BONUS       = "ten_bonus",        -- 10: 若弃置过, 最终+1
-    JACK_DRAW       = "jack_draw",        -- J: 弃置时所有补牌可逐张选择从弃牌堆或抽牌堆抽取
-    QUEEN_TRIPLE    = "queen_triple",     -- Q: 使对方最小普通牌点数×3
-    KING_BONUS      = "king_bonus",       -- K: 对方向上取整到十位, 己方向下取整到十位
-    JOKER_SMALL     = "joker_small",      -- 小王: 移除对方一张牌
-    JOKER_BIG       = "joker_big",        -- 大王: 选择自己任意点数
+    TEN_REDUCE      = "ten_reduce",       -- 10: 己方罕见牌(J/Q/K)点数-10
+    JACK_ZERO       = "jack_zero",        -- J: 己方普通牌点数视为0
+    QUEEN_TRIPLE    = "queen_triple",     -- Q: 对方最大普通牌×3, 己方取整
+    KING_DOUBLE     = "king_double",      -- K: 对方普通牌点数×2
+    JOKER_SMALL     = "joker_small",      -- 小王: 点数0~13
+    JOKER_BIG       = "joker_big",        -- 大王: 结算前改一张牌点数, 自身0~13
 }
 
 -- 子阶段(玩家/AI回合)
 Constant.SUB_PHASE = {
     PLAYER_TURN = "player_turn",
     AI_TURN     = "ai_turn",
-    JACK_PICK   = "jack_pick",
+
     WAITING     = "waiting",
 }
 

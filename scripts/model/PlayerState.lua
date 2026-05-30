@@ -15,9 +15,7 @@ function PlayerState.New(isAI)
     self.deck = {}              -- 抽牌堆(各自独立)
     self.discardPile = {}       -- 弃牌堆(各自独立)
     self.keepCard = nil         -- 保留到下一局的牌
-    self.pendingJackPicks = 0   -- J效果待处理次数
 
-    self.discardedJackCount = 0 -- 本局弃置的J的数量(用于J的补牌选择效果)
     return self
 end
 
@@ -26,8 +24,6 @@ function PlayerState:ResetHand()
     -- 清除所有牌上的大王改值效果(仅单局生效)
     self:ClearJokerOverrides()
     self.hand = {}
-    self.pendingJackPicks = 0
-    self.discardedJackCount = 0
 end
 
 --- 清除所有牌上的 jokerOverride(大王改值效果仅当局有效)
@@ -43,10 +39,35 @@ function PlayerState:ClearJokerOverrides()
     end
 end
 
---- 添加牌到手中
+--- 花色排序: 方块 < 梅花 < 红桃 < 黑桃
+local SUIT_ORDER = { diamond = 1, club = 2, heart = 3, spade = 4 }
+
+--- 排序键: 2-13升序, A(1)排在K后, 小王(14)再后, 大王(15)最后
+--- 同rank按花色排序
+---@param card table
+---@return number rankKey
+---@return number suitKey
+local function cardSortKeys(card)
+    local r = card.rank
+    local rankKey
+    if r >= 2 and r <= 13 then rankKey = r        -- 2-13 → 2-13
+    elseif r == 1 then rankKey = 14               -- A → 14
+    elseif r == 14 then rankKey = 15              -- 小王 → 15
+    else rankKey = 16 end                         -- 大王 → 16
+    local suitKey = SUIT_ORDER[card.suit] or 0
+    return rankKey, suitKey
+end
+
+--- 添加牌到手中(自动保持排序: 2-K A 小王 大王, 同rank按方块/梅花/红桃/黑桃)
 ---@param card table
 function PlayerState:AddToHand(card)
     table.insert(self.hand, card)
+    table.sort(self.hand, function(a, b)
+        local ar, as = cardSortKeys(a)
+        local br, bs = cardSortKeys(b)
+        if ar ~= br then return ar < br end
+        return as < bs
+    end)
 end
 
 --- 从手中移除指定索引的牌

@@ -138,12 +138,7 @@ function GameController.GetAIDeckCount()
     return #state.ai.deck
 end
 
---- 获取 pendingJackPicks 数量
----@return number
-function GameController.GetPendingJackPicks()
-    if not state then return 0 end
-    return state.player.pendingJackPicks
-end
+
 
 --- 获取结算结果
 ---@return table|nil
@@ -204,20 +199,7 @@ function GameController.PlayerDiscard(indices)
     return PhaseManager.PlayerDiscard(state, indices)
 end
 
---- 玩家J效果: 从弃牌堆或抽牌堆抽牌
----@param source string "discard" 或 "deck"
----@return boolean success
----@return string|nil errMsg
----@return table|nil card
-function GameController.PlayerJackPick(source)
-    if not state then return false, "游戏未初始化", nil end
-    local success, err, card = EffectSystem.PlayerJackPick(state.player, state.round, source)
-    if success and state.player.pendingJackPicks <= 0 then
-        -- J效果全部处理完，恢复正常子阶段
-        state.round.subPhase = Constant.SUB_PHASE.PLAYER_TURN
-    end
-    return success, err, card
-end
+
 
 --- 玩家弃牌后完成回合(触发AI行动 + 推进回合)
 function GameController.FinishPlayerTurn()
@@ -259,12 +241,11 @@ function GameController.PlayerHasBigJoker()
     return false
 end
 
---- 玩家小王效果: 移除AI指定索引的牌
----@param targetIdx number
----@return table|nil removedCard
-function GameController.PlayerSmallJokerEffect(targetIdx)
-    if not state then return nil end
-    return EffectSystem.PlayerSmallJokerEffect(state, targetIdx)
+--- 设置玩家小王点数
+---@param value number 0-13
+function GameController.PlayerSetSmallJokerValue(value)
+    if not state then return end
+    EffectSystem.PlayerSetSmallJokerValue(state, value)
 end
 
 --- 玩家大王: 设置目标牌点数
@@ -280,19 +261,6 @@ end
 function GameController.PlayerSetBigJokerSelfValue(value)
     if not state then return end
     EffectSystem.PlayerSetBigJokerSelfValue(state, value)
-end
-
---- 设置玩家小王点数(自动最优)
-function GameController.PlayerSetSmallJokerValue()
-    if not state then return end
-    EffectSystem.PlayerSetSmallJokerValue(state)
-end
-
---- 获取AI小王移除的玩家牌信息(供翻牌动画延迟展示)
----@return table|nil removedCard
-function GameController.GetAISmallJokerRemoved()
-    if not state or not state.round then return nil end
-    return state.round.aiSmallJokerRemoved
 end
 
 --- 进入结算后阶段

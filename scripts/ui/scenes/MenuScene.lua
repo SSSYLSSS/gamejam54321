@@ -134,7 +134,7 @@ function MenuScene.Build(callbacks)
         alignItems = "center",
         children = {
             UI.Label {
-                text = "v1.3  |  GameJam 2025",
+                text = "v1.3  |  聚光灯48小时GameJam广州站2026",
                 fontSize = 11,
                 fontColor = { 100, 110, 130, 180 },
             },
@@ -281,7 +281,7 @@ function MenuScene.BuildDifficultySelect(callbacks)
 end
 
 --- 构建多人游戏房间选择 UI
----@param callbacks table {onCreateRoom, onJoinRoom, onBack}
+---@param callbacks table {onStartMatch, onBack}
 ---@return table root
 function MenuScene.BuildMultiplayerMenu(callbacks)
     return UI.Panel {
@@ -308,8 +308,7 @@ function MenuScene.BuildMultiplayerMenu(callbacks)
                         fontColor = Colors.gold,
                     },
                     UI.Panel { width = "80%", height = 1, backgroundColor = Colors.menuBorder, marginVertical = 4 },
-                    CreateMenuButton("创建房间", Colors.accent, callbacks.onCreateRoom),
-                    CreateMenuButton("加入房间", { 130, 200, 180, 255 }, callbacks.onJoinRoom),
+                    CreateMenuButton("开始匹配", Colors.accent, callbacks.onStartMatch),
                     UI.Panel { height = 8 },
                     CreateMenuButton("返回菜单", Colors.textDim, callbacks.onBack),
                 }
