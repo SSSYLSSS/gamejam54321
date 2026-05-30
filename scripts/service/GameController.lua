@@ -267,11 +267,19 @@ function GameController.PlayerSmallJokerEffect(targetIdx)
     return EffectSystem.PlayerSmallJokerEffect(state, targetIdx)
 end
 
---- 玩家大王: 设置点数
+--- 玩家大王: 设置目标牌点数
+---@param targetIdx number 要修改的手牌索引
 ---@param value number 0-13
 function GameController.PlayerSetBigJokerValue(targetIdx, value)
     if not state then return end
     EffectSystem.PlayerSetBigJokerValue(state, targetIdx, value)
+end
+
+--- 玩家大王: 设置大王自身点数
+---@param value number 0-13
+function GameController.PlayerSetBigJokerSelfValue(value)
+    if not state then return end
+    EffectSystem.PlayerSetBigJokerSelfValue(state, value)
 end
 
 --- 设置玩家小王点数(自动最优)

@@ -1041,35 +1041,48 @@ function GameScene._HandleJokerPhase()
     end
 end
 
---- 小王选择UI: 让玩家选择移除AI的哪张牌
+--- 小王选择UI: 让玩家选择移除AI的哪张牌(看不见对方卡牌,显示牌背)
 function GameScene._ShowSmallJokerChoiceUI()
     if not uiRoot then return end
     local aiHand = GameController.GetAIHand()
 
-    local cardButtons = {}
+    -- 收集可选索引(排除7)
+    local selectableIndices = {}
     for i, card in ipairs(aiHand) do
-        if card.rank ~= 7 then  -- 不能选7
-            table.insert(cardButtons, UI.Button {
-                text = string.format("%s (%d点)", Card.GetName(card), Card.GetBasePoints(card)),
-                width = "100%",
-                height = 38,
-                fontSize = 13,
-                backgroundColor = { 100, 40, 40, 220 },
-                borderRadius = 6,
-                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
-                onClick = function()
-                    SFXManager.Play("buttonPress")
-                    GameScene._OnSmallJokerChoice(i)
-                end,
-            })
+        if card.rank ~= 7 then
+            table.insert(selectableIndices, i)
         end
     end
 
     -- 如果AI所有牌都是7(极端情况), 直接跳过
-    if #cardButtons == 0 then
+    if #selectableIndices == 0 then
         GameController.PlayerSetSmallJokerValue()
         GameScene._AfterSmallJokerChoice()
         return
+    end
+
+    -- 创建牌背按钮(玩家看不见对方卡牌)
+    local cardBackWidgets = {}
+    for _, idx in ipairs(selectableIndices) do
+        table.insert(cardBackWidgets, UI.Button {
+            width = 70,
+            height = 100,
+            backgroundColor = { 60, 75, 110, 255 },
+            hoverBackgroundColor = { 80, 100, 145, 255 },
+            borderRadius = 6,
+            borderWidth = 1,
+            borderColor = { 85, 95, 130, 200 },
+            justifyContent = "center",
+            alignItems = "center",
+            children = {
+                UI.Label { text = "?", fontSize = 28, fontColor = { 120, 140, 180, 255 } },
+            },
+            onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+            onClick = function()
+                SFXManager.Play("buttonPress")
+                GameScene._OnSmallJokerChoice(idx)
+            end,
+        })
     end
 
     local overlay = UI.Panel {
@@ -1082,13 +1095,13 @@ function GameScene._ShowSmallJokerChoiceUI()
         alignItems = "center",
         children = {
             UI.Panel {
-                width = 280,
+                width = 360,
                 backgroundColor = Colors.menuCard,
                 borderRadius = 12,
                 borderWidth = 1,
                 borderColor = { 150, 80, 200, 150 },
                 padding = 20,
-                gap = 12,
+                gap = 14,
                 alignItems = "center",
                 children = {
                     UI.Label {
@@ -1097,12 +1110,15 @@ function GameScene._ShowSmallJokerChoiceUI()
                         fontColor = Colors.jokerPurple,
                     },
                     UI.Label {
-                        text = "选择移除对方的一张牌:",
+                        text = string.format("对方有 %d 张牌，随机选择一张移除:", #selectableIndices),
                         fontSize = 13,
                         fontColor = Colors.textDim,
                         textAlign = "center",
                     },
-                    table.unpack(cardButtons),
+                    UI.Panel {
+                        flexDirection = "row", gap = 8, flexWrap = "wrap", justifyContent = "center",
+                        children = cardBackWidgets,
+                    },
                 }
             },
         }
@@ -1304,6 +1320,102 @@ function GameScene._OnBigJokerChoice(targetIdx, value)
     -- 设置目标牌的点数
     GameController.PlayerSetBigJokerValue(targetIdx, value)
 
+    -- 第三步: 为大王自身选择点数
+    GameScene._ShowBigJokerSelfValueUI()
+end
+
+--- 大王选择UI: 第三步 - 为大王自身选择点数(0-13)
+function GameScene._ShowBigJokerSelfValueUI()
+    if not uiRoot then return end
+
+    -- 计算推荐值(让总分接近21)
+    local playerHand = GameController.GetPlayerHand()
+    local otherPts = 0
+    for _, card in ipairs(playerHand) do
+        if card.rank ~= 15 then  -- 不算大王自身
+            local pts = card.jokerOverride or Card.GetBasePoints(card)
+            otherPts = otherPts + pts
+        end
+    end
+    local recommended = math.max(0, math.min(13, GameConfig.TARGET_POINTS - otherPts))
+
+    -- 创建点数按钮行
+    local rows = {}
+    for row = 0, 1 do
+        local rowBtns = {}
+        local startVal = row * 7
+        local endVal = math.min(startVal + 6, 13)
+        for v = startVal, endVal do
+            local isRec = (v == recommended)
+            table.insert(rowBtns, UI.Button {
+                text = tostring(v),
+                width = 36,
+                height = 34,
+                fontSize = 13,
+                backgroundColor = isRec and { 60, 120, 60, 220 } or { 50, 50, 80, 220 },
+                borderRadius = 6,
+                borderWidth = isRec and 2 or 0,
+                borderColor = isRec and { 100, 255, 100, 200 } or nil,
+                onPointerEnter = function() SFXManager.Play("buttonFocus") end,
+                onClick = function()
+                    SFXManager.Play("buttonPress")
+                    GameScene._OnBigJokerSelfChoice(v)
+                end,
+            })
+        end
+        table.insert(rows, UI.Panel {
+            flexDirection = "row", gap = 4, justifyContent = "center",
+            children = rowBtns,
+        })
+    end
+
+    local overlay = UI.Panel {
+        id = "jokerChoiceOverlay",
+        width = "100%",
+        height = "100%",
+        position = "absolute",
+        backgroundColor = { 0, 0, 0, 200 },
+        justifyContent = "center",
+        alignItems = "center",
+        children = {
+            UI.Panel {
+                width = 300,
+                backgroundColor = Colors.menuCard,
+                borderRadius = 12,
+                borderWidth = 1,
+                borderColor = { 150, 80, 200, 150 },
+                padding = 20,
+                gap = 12,
+                alignItems = "center",
+                children = {
+                    UI.Label {
+                        text = "大王效果",
+                        fontSize = 18,
+                        fontColor = Colors.jokerPurple,
+                    },
+                    UI.Label {
+                        text = string.format("设置大王自身的点数: (推荐: %d)", recommended),
+                        fontSize = 13,
+                        fontColor = Colors.textDim,
+                        textAlign = "center",
+                    },
+                    rows[1],
+                    rows[2],
+                }
+            },
+        }
+    }
+    uiRoot:AddChild(overlay)
+end
+
+function GameScene._OnBigJokerSelfChoice(value)
+    -- 关闭选择UI
+    local overlay = uiRoot:FindById("jokerChoiceOverlay")
+    if overlay then overlay:Remove() end
+
+    -- 设置大王自身点数
+    GameController.PlayerSetBigJokerSelfValue(value)
+
     -- 全部处理完, 进入结算
     local result = GameController.DoJokerAndSettle()
     GameScene._ShowSettlementResult(result)
@@ -1470,10 +1582,10 @@ local function buildEffectDetails(hand, details, isPlayer)
     end
 
     -- Q 效果
-    if details.queenTripled then
-        local origPts = details.queenTripleOriginal or "?"
+    if details.queenTripled and details.queenDoubleMap then
+        local qCount = details.queenCount or 1
         table.insert(effects, UI.Label {
-            text = string.format("被对方Q效果: 最小普通牌点数×3 (%s→%s)", origPts, origPts * 3),
+            text = string.format("被对方Q效果(%d张): 最大普通牌点数×2", qCount),
             fontSize = 11,
             fontColor = { 180, 80, 200, 255 },
         })

@@ -41,33 +41,42 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
     end
 
     -- =======================================================================
-    -- 1. 对方 Q 效果: 使我方手牌中点数最小的一张普通牌(2-6)点数×3
+    -- 1. 对方 Q 效果: 每张Q使我方手牌中点数最大的一张普通牌(2-6)点数×2
+    --    多张Q可叠加, 每次翻倍当前点数最大的普通牌
     -- =======================================================================
-    local queenTripleIdx = nil
+    local queenDoubleMap = {}  -- idx -> 翻倍次数
     local opponentQueenCount = 0
     for _, card in ipairs(opponentHand) do
         if card.rank == 12 then
             opponentQueenCount = opponentQueenCount + 1
         end
     end
-    if opponentQueenCount > 0 then
-        -- 找我方点数最小的普通牌(2-6)
-        local minPts = math.huge
-        local minIdx = nil
-        for i, card in ipairs(hand) do
-            if Card.IsNormal(card) then
-                local pts = Card.GetBasePoints(card)
-                if pts < minPts then
-                    minPts = pts
-                    minIdx = i
-                end
+    -- 用临时数组追踪每张普通牌的当前有效点数(被Q翻倍后的)
+    local tempNormalPts = {}
+    for i, card in ipairs(hand) do
+        if Card.IsNormal(card) then
+            tempNormalPts[i] = Card.GetBasePoints(card)
+        end
+    end
+    for _ = 1, opponentQueenCount do
+        -- 每张Q找当前点数最大的普通牌翻倍
+        local maxPts = -1
+        local maxIdx = nil
+        for idx, pts in pairs(tempNormalPts) do
+            if pts > maxPts then
+                maxPts = pts
+                maxIdx = idx
             end
         end
-        if minIdx then
-            queenTripleIdx = minIdx
-            details.queenTripled = true
-            details.queenTripleOriginal = minPts
+        if maxIdx then
+            tempNormalPts[maxIdx] = tempNormalPts[maxIdx] * 2
+            queenDoubleMap[maxIdx] = (queenDoubleMap[maxIdx] or 0) + 1
         end
+    end
+    if opponentQueenCount > 0 and next(queenDoubleMap) then
+        details.queenTripled = true  -- 复用字段名表示Q效果生效
+        details.queenDoubleMap = queenDoubleMap
+        details.queenCount = opponentQueenCount
     end
 
     -- =======================================================================
@@ -111,9 +120,11 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
             goto continue
         end
 
-        -- Q 效果: 被对方Q影响的普通牌点数×3
-        if i == queenTripleIdx then
-            points = points * 3
+        -- Q 效果: 被对方Q影响的普通牌, 每张Q翻倍一次
+        if queenDoubleMap[i] then
+            for _ = 1, queenDoubleMap[i] do
+                points = points * 2
+            end
         end
 
         -- J 翻倍效果: 对方弃置过 J, 我方普通牌(2-6)翻倍

@@ -170,25 +170,31 @@ function EffectSystem.PlayerSmallJokerEffect(gameState, targetIdx)
     return removed
 end
 
---- 设置玩家大王的点数
+--- 设置玩家大王效果: 将指定手牌的点数覆盖为任意值
 ---@param gameState table GameState
+---@param targetIdx number 要修改的手牌索引
 ---@param value number 玩家选择的点数(0-13)
 function EffectSystem.PlayerSetBigJokerValue(gameState, targetIdx, value)
     value = math.max(GameConfig.JOKER_MIN_VALUE, math.min(GameConfig.JOKER_MAX_VALUE, value))
     local hand = gameState.player.hand
-    -- 选择手牌中的一张牌将其点数设为指定值
     if targetIdx and targetIdx >= 1 and targetIdx <= #hand then
         local card = hand[targetIdx]
         card.jokerOverride = value  -- 大王赋予的覆盖点数
         gameState:AddLog(string.format("大王效果: 将 %s 的点数设为 %d", Card.GetName(card), value))
-    else
-        -- 兜底: 设置大王自身
-        for _, card in ipairs(hand) do
-            if card.rank == 15 then
-                card.jokerValue = value
-                gameState:AddLog(string.format("大王选择点数: %d", value))
-                return
-            end
+    end
+end
+
+--- 设置玩家大王自身的点数
+---@param gameState table GameState
+---@param value number 玩家选择的点数(0-13)
+function EffectSystem.PlayerSetBigJokerSelfValue(gameState, value)
+    value = math.max(GameConfig.JOKER_MIN_VALUE, math.min(GameConfig.JOKER_MAX_VALUE, value))
+    local hand = gameState.player.hand
+    for _, card in ipairs(hand) do
+        if card.rank == 15 then
+            card.jokerValue = value
+            gameState:AddLog(string.format("大王自身点数: %d", value))
+            return
         end
     end
 end
