@@ -17,6 +17,8 @@ local TutorialScene = require("ui.scenes.TutorialScene")
 local AISystem = require("system.AISystem")
 local StatsSystem = require("system.StatsSystem")
 local SaveSystem = require("system.SaveSystem")
+local MatchHistory = require("system.MatchHistory")
+local ReplayScene = require("ui.scenes.ReplayScene")
 local GameState = require("model.GameState")
 local PlayerState = require("model.PlayerState")
 local RoundState = require("model.RoundState")
@@ -90,6 +92,9 @@ local function ShowMenu()
         end,
         onMultiplayer = function()
             ShowMultiplayer()
+        end,
+        onReplay = function()
+            ShowReplay()
         end,
         onTutorial = function()
             ShowTutorial()
@@ -175,10 +180,57 @@ function ShowGame(fromSave)
     GameScene.Refresh()
 end
 
---- 切换到多人游戏提示
+--- 切换到多人游戏
 function ShowMultiplayer()
     currentScene = "multiplayer"
-    local root = MenuScene.BuildMultiplayerNotice(function()
+
+    -- 检查是否有可用的服务器连接 (background_match 模式)
+    local hasConnection = false
+    if network and network.GetServerConnection then
+        local conn = network:GetServerConnection()
+        if conn then hasConnection = true end
+    end
+
+    if hasConnection then
+        -- 已匹配成功，直接进入多人游戏
+        StartMultiplayerGame()
+    else
+        -- 显示匹配等待界面
+        local root = MenuScene.BuildMultiplayerWaiting(function()
+            CancelMultiplayer()
+        end)
+        UI.SetRoot(root)
+
+        -- 订阅 ServerReady 事件
+        SubscribeToEvent("ServerReady", "HandleServerReady")
+    end
+end
+
+--- 取消多人匹配，返回主菜单
+function CancelMultiplayer()
+    UnsubscribeFromEvent("ServerReady")
+    ShowMenu()
+end
+
+--- ServerReady 事件处理: 匹配成功
+function HandleServerReady(eventType, eventData)
+    if currentScene == "multiplayer" then
+        StartMultiplayerGame()
+    end
+end
+
+--- 启动多人游戏客户端
+function StartMultiplayerGame()
+    local Client = require("network.Client")
+    Client.Start()
+    currentScene = "multiplayer_game"
+end
+
+--- 切换到对局回放
+function ShowReplay()
+    currentScene = "replay"
+    VFXManager.ClearParticles()
+    local root = ReplayScene.BuildList(function()
         ShowMenu()
     end)
     UI.SetRoot(root)
@@ -240,10 +292,13 @@ function Start()
     -- 4. 加载统计数据
     StatsSystem.Load()
 
-    -- 5. 显示主菜单
+    -- 5. 加载对局历史
+    MatchHistory.Load()
+
+    -- 6. 显示主菜单
     ShowMenu()
 
-    -- 5. 订阅事件
+    -- 7. 订阅事件
     SubscribeToEvent("Update", "HandleUpdate")
     SubscribeToEvent("KeyDown", "HandleKeyDown")
 end
@@ -278,7 +333,9 @@ function HandleKeyDown(eventType, eventData)
             if not GameScene.HandleEscape() then
                 ShowMenu()
             end
-        elseif currentScene == "settings" or currentScene == "multiplayer" or currentScene == "difficulty" or currentScene == "stats" or currentScene == "tutorial" then
+        elseif currentScene == "multiplayer" then
+            CancelMultiplayer()
+        elseif currentScene == "settings" or currentScene == "difficulty" or currentScene == "stats" or currentScene == "tutorial" or currentScene == "replay" then
             ShowMenu()
         else
             engine:Exit()

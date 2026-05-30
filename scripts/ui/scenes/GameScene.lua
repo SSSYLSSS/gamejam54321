@@ -14,6 +14,7 @@ local StatsSystem = require("system.StatsSystem")
 local SaveSystem = require("system.SaveSystem")
 local VFXManager = require("vfx.VFXManager")
 local GameLogViewer = require("ui.components.GameLogViewer")
+local MatchHistory = require("system.MatchHistory")
 
 local GameScene = {}
 
@@ -247,13 +248,6 @@ function GameScene._CreateTopBar()
                         text = "第 0 局",
                         fontSize = 14,
                         fontColor = Colors.textDim,
-                    },
-                    UI.Button {
-                        text = "日志",
-                        fontSize = 11,
-                        height = 28,
-                        fontColor = { 180, 190, 210, 255 },
-                        onClick = function() GameScene._ShowGameLog() end,
                     },
                 }
             },
@@ -772,7 +766,7 @@ end
 -- 内部: 统计记录
 -- ============================================================================
 
---- 记录游戏结束统计(防重复) + 删除存档
+--- 记录游戏结束统计(防重复) + 删除存档 + 保存对局历史
 local function recordGameOverStats()
     if gameStatsRecorded then return end
     gameStatsRecorded = true
@@ -786,6 +780,19 @@ local function recordGameOverStats()
 
     StatsSystem.RecordGame(winner or "tie", difficulty, pw, aw, hadSeven, playerPts)
     SaveSystem.Delete()
+
+    -- 保存对局历史(用于回放)
+    local result = "tie"
+    if winner == "player" then result = "win"
+    elseif winner == "ai" then result = "lose" end
+
+    local log = GameController.GetLog()
+    MatchHistory.Record({
+        difficulty = difficulty,
+        result = result,
+        finalScore = { pw, aw },
+        log = log,
+    })
 end
 
 -- ============================================================================

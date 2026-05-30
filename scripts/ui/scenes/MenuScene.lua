@@ -41,6 +41,7 @@ function MenuScene.Build(callbacks)
 
     table.insert(buttons, CreateMenuButton("开始游戏", Colors.accent, callbacks.onStart))
     table.insert(buttons, CreateMenuButton("多人游戏", Colors.gold, callbacks.onMultiplayer))
+    table.insert(buttons, CreateMenuButton("对局回放", { 120, 180, 220, 255 }, callbacks.onReplay))
     table.insert(buttons, CreateMenuButton("教程", { 180, 160, 255, 255 }, callbacks.onTutorial))
     table.insert(buttons, CreateMenuButton("统计", { 130, 200, 180, 255 }, callbacks.onStats))
     table.insert(buttons, CreateMenuButton("设置", Colors.textDim, callbacks.onSettings))
@@ -209,10 +210,10 @@ function MenuScene.BuildDifficultySelect(callbacks)
     }
 end
 
---- 构建多人游戏提示 UI
+--- 构建多人游戏匹配等待 UI
 ---@param onBack function
 ---@return table root
-function MenuScene.BuildMultiplayerNotice(onBack)
+function MenuScene.BuildMultiplayerWaiting(onBack)
     return UI.Panel {
         id = "root",
         width = "100%",
@@ -237,14 +238,20 @@ function MenuScene.BuildMultiplayerNotice(onBack)
                         fontColor = Colors.gold,
                     },
                     UI.Label {
-                        text = "敬请期待...\n多人对战功能正在开发中",
-                        fontSize = 13,
+                        text = "正在匹配对手...",
+                        fontSize = 15,
+                        fontColor = Colors.accent,
+                        textAlign = "center",
+                    },
+                    UI.Label {
+                        text = "匹配成功后将自动进入游戏",
+                        fontSize = 12,
                         fontColor = Colors.textDim,
                         textAlign = "center",
                     },
                     UI.Panel { height = 8 },
                     UI.Button {
-                        text = "返回",
+                        text = "取消",
                         width = "100%",
                         height = 40,
                         onClick = onBack,

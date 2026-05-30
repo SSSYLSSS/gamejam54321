@@ -28,7 +28,8 @@
         "desc_name": "free_match_with_ai",
         "player_number": 2,
         "match_timeout": 30
-      }
+      },
+      "background_match": true
     }
   }
 }
