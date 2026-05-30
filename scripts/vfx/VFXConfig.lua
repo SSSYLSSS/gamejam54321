@@ -11,7 +11,7 @@ VFXConfig.BLOOM_OUTER_ALPHA = 0.1
 VFXConfig.BLOOM_SIZE = 2.0
 
 -- 粒子系统
-VFXConfig.MAX_PARTICLES = 200
+VFXConfig.MAX_PARTICLES = 500
 VFXConfig.PARTICLE_GRAVITY = 120    -- 像素/秒²
 
 -- 动态背景

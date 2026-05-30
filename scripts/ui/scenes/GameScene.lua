@@ -1133,10 +1133,19 @@ function GameScene._ShowSmallJokerChoiceUI()
     uiRoot:AddChild(overlay)
 end
 
+-- 玩家小王移除的AI牌(用于结算时半透明展示)
+local playerSmallJokerRemovedCard = nil
+local playerSmallJokerRemovedIdx = nil
+
 function GameScene._OnSmallJokerChoice(idx)
     -- 关闭选择UI
     local overlay = uiRoot:FindById("jokerChoiceOverlay")
     if overlay then overlay:Remove() end
+
+    -- 记录被移除的AI牌信息(用于结算半透明展示)
+    local aiHand = GameController.GetAIHand()
+    playerSmallJokerRemovedCard = aiHand[idx]
+    playerSmallJokerRemovedIdx = idx
 
     -- 执行小王效果
     GameController.PlayerSmallJokerEffect(idx)
@@ -1461,6 +1470,16 @@ function GameScene._ShowSettlementResult(result)
         table.insert(displayPlayerHand, aiSmallJokerRemoved)
     end
 
+    -- 玩家小王移除的AI牌: 构建展示用AI手牌(包含被移除的牌,半透明显示)
+    local displayAIHand = {}
+    for _, c in ipairs(aiHand) do
+        table.insert(displayAIHand, c)
+    end
+    if playerSmallJokerRemovedCard and playerSmallJokerRemovedIdx then
+        -- 插回原位置
+        table.insert(displayAIHand, playerSmallJokerRemovedIdx, playerSmallJokerRemovedCard)
+    end
+
     -- 计算玩家"裸分"(不含对方效果影响的基础得分)
     local RuleEngine = require("system.RuleEngine")
     local playerRawPts = 0
@@ -1477,15 +1496,21 @@ function GameScene._ShowSettlementResult(result)
         aiHand = aiHand,
         playerHand = playerHand,
         displayPlayerHand = displayPlayerHand,  -- 展示用(可能比playerHand多一张)
+        displayAIHand = displayAIHand,  -- 展示用AI手牌(包含被玩家小王移除的牌)
         playerRawPoints = playerRawPts,  -- 翻牌期间展示的裸分
         aiSmallJokerRemoved = aiSmallJokerRemoved,  -- 被AI小王移除的牌
         aiSmallJokerIdx = aiSmallJokerIdx,  -- AI小王在手牌中的索引
+        playerSmallJokerRemovedCard = playerSmallJokerRemovedCard,  -- 被玩家小王移除的AI牌
+        playerSmallJokerRemovedIdx = playerSmallJokerRemovedIdx,  -- 在AI手牌中的原始索引
         jokerRevealTriggered = false,  -- 是否已触发小王视觉移除
         revealedCount = 0,
         timer = 0,
         interval = 1.0,  -- 每1.0秒翻一张
         finished = false,
     }
+    -- 清理玩家小王记录(本局已用)
+    playerSmallJokerRemovedCard = nil
+    playerSmallJokerRemovedIdx = nil
     -- 创建结算弹窗
     GameScene._CreateSettlementOverlay()
 end
@@ -1513,8 +1538,15 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
     if not aiCard then return end
 
     local playerHand = anim.displayPlayerHand or anim.playerHand
-    local aiCount = #anim.aiHand
+    local displayAIHand = anim.displayAIHand or anim.aiHand
+    local aiCount = #displayAIHand  -- 使用展示手牌数量计算布局
     local playerCount = #playerHand
+
+    -- 将 aiHand 索引映射到 displayAIHand 索引(考虑插入的半透明牌)
+    local displayRevealedIdx = revealedIdx
+    if anim.playerSmallJokerRemovedIdx and revealedIdx >= anim.playerSmallJokerRemovedIdx then
+        displayRevealedIdx = revealedIdx + 1
+    end
 
     -- 判断哪些玩家牌受影响
     local affectedIndices = {}
@@ -1575,7 +1607,7 @@ function GameScene._TriggerSkillBeamVFX(revealedIdx)
     local aiStartX = centerAreaLeft + (centerAreaW - aiTotalW) * 0.5
     local aiY = 50 + 6 + 13 + 6 + aiCardH * 0.5  -- topBar + gap + label + gap + 半高
 
-    local srcX = aiStartX + (revealedIdx - 1) * (aiCardW + 12) + aiCardW * 0.5
+    local srcX = aiStartX + (displayRevealedIdx - 1) * (aiCardW + 12) + aiCardW * 0.5
     local srcY = aiY
 
     -- 玩家牌位置估算
@@ -1669,8 +1701,9 @@ function GameScene._EmitSmallJokerBeam()
     local sw = graphics:GetWidth() / graphics:GetDPR()
     local sh = graphics:GetHeight() / graphics:GetDPR()
 
-    -- AI小王位置(复用 _TriggerSkillBeamVFX 的坐标估算逻辑)
-    local aiCount = #anim.aiHand
+    -- AI小王位置(使用displayAIHand计算布局)
+    local displayAIHand = anim.displayAIHand or anim.aiHand
+    local aiCount = #displayAIHand
     local aiCardW = 120
     local aiCardH = 168
     local aiTotalW = aiCount * aiCardW + (aiCount - 1) * 12
@@ -1679,7 +1712,13 @@ function GameScene._EmitSmallJokerBeam()
     local aiStartX = centerAreaLeft + (centerAreaW - aiTotalW) * 0.5
     local aiY = 50 + 6 + 13 + 6 + aiCardH * 0.5
 
-    local srcX = aiStartX + (anim.aiSmallJokerIdx - 1) * (aiCardW + 12) + aiCardW * 0.5
+    -- 将 aiHand 索引映射到 displayAIHand 索引
+    local displayJokerIdx = anim.aiSmallJokerIdx
+    if anim.playerSmallJokerRemovedIdx and anim.aiSmallJokerIdx >= anim.playerSmallJokerRemovedIdx then
+        displayJokerIdx = anim.aiSmallJokerIdx + 1
+    end
+
+    local srcX = aiStartX + (displayJokerIdx - 1) * (aiCardW + 12) + aiCardW * 0.5
     local srcY = aiY
 
     -- 被移除的玩家牌位置(在 displayPlayerHand 的末尾)
@@ -1759,12 +1798,32 @@ function GameScene._UpdateAIHandInPlace()
     aiHandWidgets = {}
     panel:ClearChildren()
 
-    -- 逐张显示：已翻的显示正面，未翻的显示背面
-    for i, card in ipairs(anim.aiHand) do
+    -- 使用 displayAIHand(包含被玩家小王移除的牌)
+    local hand = anim.displayAIHand or anim.aiHand
+    local removedIdx = anim.playerSmallJokerRemovedIdx  -- 被玩家小王移除的牌索引
+
+    -- 计算真实翻牌进度(displayAIHand 可能比 aiHand 多一张)
+    -- revealedCount 基于 aiHand 长度, 需要映射到 displayAIHand 索引
+    local revealedInDisplay = anim.revealedCount
+    if removedIdx and anim.revealedCount > 0 then
+        -- 如果已翻过的牌索引 >= removedIdx, 需要+1偏移
+        if anim.revealedCount >= removedIdx then
+            revealedInDisplay = anim.revealedCount + 1
+        end
+    end
+
+    for i, card in ipairs(hand) do
         local widget
-        if i <= anim.revealedCount then
+        local isRemovedCard = removedIdx and (i == removedIdx) and anim.playerSmallJokerRemovedCard
+        if isRemovedCard then
+            -- 被玩家小王移除的牌: 始终正面显示+半透明
+            widget = CardWidget.Create(card, { isAI = true })
+            widget:SetStyle({ opacity = 0.3 })
+        elseif i <= revealedInDisplay and not isRemovedCard then
+            -- 已翻开: 正面显示
             widget = CardWidget.Create(card, { isAI = true })
         else
+            -- 未翻开: 背面
             widget = CardWidget.Create(nil, { isAI = true })
         end
         panel:AddChild(widget)
