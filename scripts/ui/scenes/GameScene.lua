@@ -451,20 +451,20 @@ function GameScene._CreateMiddleArea()
             UI.Label {
                 id = "phaseLabel",
                 text = "",
-                fontSize = 15,
+                fontSize = 17,
                 fontColor = Colors.accent,
             },
             UI.Label {
                 id = "infoLabel",
                 text = "",
-                fontSize = 13,
+                fontSize = 15,
                 fontColor = Colors.textDim,
                 textAlign = "center",
             },
             UI.Label {
                 id = "pointsLabel",
                 text = "",
-                fontSize = 14,
+                fontSize = 16,
                 fontColor = Colors.gold,
             },
         }
@@ -2198,6 +2198,9 @@ function GameScene._CloseSettlementOverlay()
     local cdOverlay = uiRoot:FindById("countdownOverlay")
     if cdOverlay then cdOverlay:Remove() end
     VFXManager.ClearBloomImages()
+    -- 恢复中间提示区域(倒计时期间被隐藏)
+    local middleArea = uiRoot:FindById("middleArea")
+    if middleArea then middleArea:SetStyle({ opacity = 1 }) end
     -- 恢复AI标签
     local aiLabel = uiRoot:FindById("aiLabel")
     if aiLabel then aiLabel:SetText("AI 对手") end
