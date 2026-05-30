@@ -298,6 +298,11 @@ function PhaseManager.PlayerPostDiscard(gameState, discardIndices)
             gameState:AddLog("弃置至牌堆: " .. Card.GetName(card))
         end
     end
+
+    -- 放回后洗牌，避免下次必定抽到这些牌
+    if count > 0 then
+        DeckSystem.Shuffle(player.deck)
+    end
 end
 
 --- 玩家结算后保留 (一!)
@@ -361,6 +366,8 @@ function PhaseManager.AIPostGame(gameState)
     end
     if #returnedNames > 0 then
         gameState:AddLog("AI 放回抽牌堆: " .. table.concat(returnedNames, ", "))
+        -- 放回后洗牌，避免下次必定抽到这些牌
+        DeckSystem.Shuffle(ai.deck)
     end
 
     -- 剩余放入AI自己的弃牌堆

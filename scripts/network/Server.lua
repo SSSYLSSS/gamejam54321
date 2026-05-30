@@ -383,6 +383,11 @@ local function ProcessPostDiscard(playerId, discardIndices)
             playerState:AddToDeck(card)
         end
     end
+
+    -- 放回后洗牌，避免下次必定抽到这些牌
+    if count > 0 then
+        DeckSystem.Shuffle(playerState.deck)
+    end
 end
 
 --- 两人都提交结算后弃牌
