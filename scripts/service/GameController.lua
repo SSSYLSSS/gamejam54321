@@ -239,6 +239,54 @@ function GameController.DoJokerAndSettle()
     return PhaseManager.DoJokerAndSettle(state)
 end
 
+--- 玩家有小王?
+---@return boolean
+function GameController.PlayerHasSmallJoker()
+    if not state then return false end
+    for _, card in ipairs(state.player.hand) do
+        if card.rank == 14 then return true end
+    end
+    return false
+end
+
+--- 玩家有大王?
+---@return boolean
+function GameController.PlayerHasBigJoker()
+    if not state then return false end
+    for _, card in ipairs(state.player.hand) do
+        if card.rank == 15 then return true end
+    end
+    return false
+end
+
+--- 玩家小王效果: 移除AI指定索引的牌
+---@param targetIdx number
+---@return table|nil removedCard
+function GameController.PlayerSmallJokerEffect(targetIdx)
+    if not state then return nil end
+    return EffectSystem.PlayerSmallJokerEffect(state, targetIdx)
+end
+
+--- 玩家大王: 设置点数
+---@param value number 0-13
+function GameController.PlayerSetBigJokerValue(value)
+    if not state then return end
+    EffectSystem.PlayerSetBigJokerValue(state, value)
+end
+
+--- 设置玩家小王点数(自动最优)
+function GameController.PlayerSetSmallJokerValue()
+    if not state then return end
+    EffectSystem.PlayerSetSmallJokerValue(state)
+end
+
+--- 获取AI小王移除的玩家牌信息(供翻牌动画延迟展示)
+---@return table|nil removedCard
+function GameController.GetAISmallJokerRemoved()
+    if not state or not state.round then return nil end
+    return state.round.aiSmallJokerRemoved
+end
+
 --- 进入结算后阶段
 function GameController.EnterPostGame()
     if not state then return end

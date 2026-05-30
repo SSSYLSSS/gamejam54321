@@ -55,7 +55,7 @@ local function getCardEffectText(card)
     if rank == 10 then return "10(10点): 若弃置过此牌, 最终点数+1" end
     if rank == 11 then return "J(11点): 弃置时从弃牌堆抽牌; 结算前翻倍对方普通牌" end
     if rank == 12 then return "Q(12点): 结算时使对方最小普通牌点数×3" end
-    if rank == 13 then return "K: 对方点数向上取整, 己方点数-5后向下取整" end
+    if rank == 13 then return "K: 对方点数四舍五入到十位, 己方-5后四舍五入到十位" end
     if rank >= 2 and rank <= 6 then
         return string.format("%d: 普通牌, %d点", rank, rank)
     end

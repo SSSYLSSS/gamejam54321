@@ -42,7 +42,7 @@ end
 ---@param immediate? boolean 是否立即切换（跳过淡出）
 function BGMManager.Play(track, immediate)
     if not soundSource then return end
-    if track == currentTrack then return end
+    if track == currentTrack and soundSource.playing then return end
 
     local file = BGM_FILES[track]
     if not file then return end
@@ -68,10 +68,17 @@ function BGMManager.Stop()
     fadeSpeed = 2.0
 end
 
---- 每帧更新（处理淡入淡出）
+--- 每帧更新（处理淡入淡出 + 循环监控）
 ---@param dt number
 function BGMManager.Update(dt)
     if not soundSource then return end
+
+    -- 循环监控: 如果应该在播放但停了(looped失效), 重新播放
+    if currentTrack and currentSound and not soundSource.playing and not pendingTrack then
+        soundSource:Play(currentSound)
+        soundSource.gain = duckGain or playGain
+    end
+
     if fadeTarget == nil then return end
 
     local current = soundSource.gain
@@ -97,6 +104,8 @@ function BGMManager.Update(dt)
                 end
             else
                 soundSource:Stop()
+                currentTrack = nil
+                currentSound = nil
             end
         else
             -- 淡入完成

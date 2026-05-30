@@ -224,6 +224,7 @@ end
 -- ============================================================================
 
 --- 处理鬼牌效果 + 执行结算
+--- 注意: 玩家的鬼牌效果已由 UI 层在进入此函数前完成
 ---@param gameState table GameState
 ---@return table result 结算结果
 function PhaseManager.DoJokerAndSettle(gameState)

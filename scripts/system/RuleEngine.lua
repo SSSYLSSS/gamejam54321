@@ -259,18 +259,22 @@ function RuleEngine.Settle(playerHand, aiHand, playerState, aiState)
         local playerPts, playerDetails = RuleEngine.CalculatePoints(playerHand, aiHand, playerState, aiState)
         local aiPts, aiDetails = RuleEngine.CalculatePoints(aiHand, playerHand, aiState, playerState)
 
-        -- K 效果: 持有K时，对方点数向上取整，自己点数-5后向下取整
+        -- K 效果: 持有K时，对方点数四舍五入到十位，自己点数-5后四舍五入到十位
         local playerKings = playerDetails.kingCount or 0
         local aiKings = aiDetails.kingCount or 0
 
+        local function roundToTen(n)
+            return math.floor(n / 10 + 0.5) * 10
+        end
+
         if playerKings > 0 then
-            aiPts = math.ceil(aiPts)         -- 对方向上取整
-            playerPts = math.floor(playerPts - 5)  -- 自己-5后向下取整
+            aiPts = roundToTen(aiPts)              -- 对方四舍五入到十位
+            playerPts = roundToTen(playerPts - 5)  -- 自己-5后四舍五入到十位
             playerDetails.kingApplied = true
         end
         if aiKings > 0 then
-            playerPts = math.ceil(playerPts)  -- 对方向上取整
-            aiPts = math.floor(aiPts - 5)     -- 自己-5后向下取整
+            playerPts = roundToTen(playerPts)      -- 对方四舍五入到十位
+            aiPts = roundToTen(aiPts - 5)          -- 自己-5后四舍五入到十位
             aiDetails.kingApplied = true
         end
 

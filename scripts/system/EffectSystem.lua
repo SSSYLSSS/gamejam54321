@@ -137,27 +137,58 @@ function EffectSystem.SmallJokerEffect(ownerHand, targetHand, targetPlayer)
     return nil
 end
 
---- 处理所有鬼牌效果（结算前阶段）
+--- 处理AI的鬼牌效果（AI自动决策部分）
+--- 玩家的鬼牌效果由 UI 层驱动，不在这里处理
 ---@param gameState table GameState
 function EffectSystem.ProcessJokerPhase(gameState)
     local playerHand = gameState.player.hand
     local aiHand = gameState.ai.hand
 
-    -- 设置鬼牌点数
-    EffectSystem.AutoSetJokerValues(playerHand)
+    -- AI大王: 自动设置最优点数
     EffectSystem.AutoSetJokerValues(aiHand)
 
-    -- 玩家小王效果: 移除AI的牌 → 放入AI的弃牌堆
-    local removedByPlayer = EffectSystem.SmallJokerEffect(playerHand, aiHand, gameState.ai)
-    if removedByPlayer then
-        gameState:AddLog("小王效果: 移除AI的 " .. Card.GetName(removedByPlayer))
-    end
-
     -- AI小王效果: 移除玩家的牌 → 放入玩家的弃牌堆
+    -- 记录被移除的牌信息，供翻牌动画延迟展示
     local removedByAI = EffectSystem.SmallJokerEffect(aiHand, playerHand, gameState.player)
     if removedByAI then
         gameState:AddLog("AI小王效果: 移除玩家的 " .. Card.GetName(removedByAI))
     end
+    -- 存储到 round 上供 UI 查询
+    gameState.round.aiSmallJokerRemoved = removedByAI
+end
+
+--- 处理玩家小王效果: 移除对方指定索引的牌
+---@param gameState table GameState
+---@param targetIdx number AI 手牌中要移除的索引
+---@return table|nil removedCard
+function EffectSystem.PlayerSmallJokerEffect(gameState, targetIdx)
+    local aiHand = gameState.ai.hand
+    if targetIdx < 1 or targetIdx > #aiHand then return nil end
+    local removed = table.remove(aiHand, targetIdx)
+    gameState.ai:AddToDiscard(removed)
+    gameState:AddLog("小王效果: 移除AI的 " .. Card.GetName(removed))
+    return removed
+end
+
+--- 设置玩家大王的点数
+---@param gameState table GameState
+---@param value number 玩家选择的点数(0-13)
+function EffectSystem.PlayerSetBigJokerValue(gameState, value)
+    value = math.max(GameConfig.JOKER_MIN_VALUE, math.min(GameConfig.JOKER_MAX_VALUE, value))
+    for _, card in ipairs(gameState.player.hand) do
+        if card.rank == 15 then  -- 大王
+            card.jokerValue = value
+            gameState:AddLog(string.format("大王选择点数: %d", value))
+            return
+        end
+    end
+end
+
+--- 设置玩家小王的点数(自动最优)
+---@param gameState table GameState
+function EffectSystem.PlayerSetSmallJokerValue(gameState)
+    -- 小王也需要设置点数(作为手牌参与计算)
+    EffectSystem.AutoSetJokerValues(gameState.player.hand)
 end
 
 --- 检查手牌中是否有鬼牌
