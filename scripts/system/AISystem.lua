@@ -251,13 +251,11 @@ local function calculateCardStrategicValue(card, hand, totalPoints)
         return score
     end
 
-    -- K: 考虑K效果(对方取整+自己-5取整，点数高时有利)
+    -- K: 对方向上取整到十位, 己方向下取整到十位 (总体有利)
     if card.rank == 13 then
-        if distance >= 5 then
-            score = score + 8  -- 点数偏高时K能让自己-5
-        else
-            score = score + 3  -- 点数偏低时K反而不利
-        end
+        -- K效果: 拉远差距, 一般是有利的
+        -- 当己方点数个位数大(如25→20)时减分多, 对方个位数小(如21→30)时加分多
+        score = score + 7
         return score
     end
 
@@ -287,13 +285,21 @@ local function calculateCardStrategicValue(card, hand, totalPoints)
         return score
     end
 
-    -- 8: 降低己方普通牌点数，配合其他牌
+    -- 8: 己方普通牌-1, 对方普通牌+2 (双刃剑: 降己方但也拉高对方)
+    -- 当己方普通牌多时8是劣势(降低太多); 当己方普通牌少时8有利(对方被+2更多)
     if card.rank == 8 then
         local normalCount = 0
         for _, c in ipairs(hand) do
             if Card.IsNormal(c) then normalCount = normalCount + 1 end
         end
-        score = score + 3 + normalCount
+        -- 己方普通牌越少, 8越有利(对方+2的收益>己方-1的损失)
+        if normalCount <= 1 then
+            score = score + 7  -- 己方没啥普通牌, 8主要拉高对方
+        elseif normalCount <= 3 then
+            score = score + 4  -- 平衡
+        else
+            score = score + 1  -- 己方普通牌太多, 8弊大于利
+        end
         return score
     end
 
@@ -432,9 +438,9 @@ local function hardDecidePostGame(hand)
         elseif card.rank == 9 then
             score = 12  -- 9灵活(0或9)
         elseif card.rank == 8 then
-            score = 8   -- 8降己方普通牌
+            score = 7   -- 8双刃剑(己方-1, 对方+2)
         elseif card.rank == 13 then
-            score = 6   -- K效果风险较高
+            score = 9   -- K取整效果总体有利
         elseif card.rank == 11 then
             score = 4   -- J弃了更好
         elseif card.rank == 10 then

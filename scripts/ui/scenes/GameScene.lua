@@ -1553,7 +1553,7 @@ local function buildEffectDetails(hand, details, isPlayer)
     -- K 效果
     if details.kingApplied then
         table.insert(effects, UI.Label {
-            text = "K: 对方点数向上取整到十位, 己方-5后向下取整到十位",
+            text = "K: 对方点数向上取整到十位, 己方点数向下取整到十位",
             fontSize = 11,
             fontColor = { 255, 160, 60, 255 },
         })
@@ -1582,10 +1582,17 @@ local function buildEffectDetails(hand, details, isPlayer)
         })
     end
 
-    -- 8 效果
-    if details.eightEffects and details.eightEffects > 0 then
+    -- 8 效果(己方8降己方普通牌, 对方8提升己方普通牌)
+    if (details.eightEffects and details.eightEffects > 0) or (details.opponentEightCount and details.opponentEightCount > 0) then
+        local parts = {}
+        if details.eightEffects and details.eightEffects > 0 then
+            table.insert(parts, string.format("己方普通牌各-%d", details.eightEffects))
+        end
+        if details.opponentEightCount and details.opponentEightCount > 0 then
+            table.insert(parts, string.format("己方普通牌各+%d(对方8)", details.opponentEightCount * 2))
+        end
         table.insert(effects, UI.Label {
-            text = string.format("8效果: 己方普通牌各-%d点", details.eightEffects),
+            text = "8效果: " .. table.concat(parts, ", "),
             fontSize = 11,
             fontColor = effectColor,
         })

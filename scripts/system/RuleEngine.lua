@@ -1,7 +1,7 @@
 -- ============================================================================
 -- system/RuleEngine.lua - 规则引擎
 -- 负责点数计算、7规则判定、胜负判定
--- 新规则: 9(0或9) / 10(弃置过+1) / J(弃置选来源+结算翻倍) / Q(对方最大普通牌×2) / K(取整)
+-- 新规则: 9(0或9) / 10(弃置过+1) / J(弃置选来源+结算翻倍) / Q(对方最大普通牌×2) / K(取整) / 8(己方普通牌-1,对方普通牌+2)
 -- ============================================================================
 
 local Card = require("core.Card")
@@ -94,7 +94,7 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
     end
 
     -- =======================================================================
-    -- 3. 统计自己手中 8 的数量 (降低自己普通牌1点)
+    -- 3. 统计8的数量: 己方8降低己方普通牌1点, 对方8提升己方普通牌2点
     -- =======================================================================
     local myEightCount = 0
     for _, card in ipairs(hand) do
@@ -102,7 +102,14 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
             myEightCount = myEightCount + 1
         end
     end
+    local opponentEightCount = 0
+    for _, card in ipairs(opponentHand) do
+        if card.rank == 8 then
+            opponentEightCount = opponentEightCount + 1
+        end
+    end
     details.eightEffects = myEightCount
+    details.opponentEightCount = opponentEightCount
 
     -- =======================================================================
     -- 4. 逐张计算点数
@@ -149,10 +156,18 @@ function RuleEngine.CalculatePoints(hand, opponentHand, playerState, opponentSta
             table.insert(breakdown.effects, "A×2")
         end
 
-        -- 8 效果: 自己的普通牌(2~6) 每张8降1点
-        if Card.IsNormal(card) and myEightCount > 0 then
-            points = math.max(0, points - myEightCount)
-            table.insert(breakdown.effects, string.format("8(-%d)", myEightCount))
+        -- 8 效果: 己方每张8使己方普通牌-1; 对方每张8使己方普通牌+2
+        if Card.IsNormal(card) and (myEightCount > 0 or opponentEightCount > 0) then
+            local delta = -myEightCount + opponentEightCount * 2
+            points = math.max(0, points + delta)
+            local parts = {}
+            if myEightCount > 0 then
+                table.insert(parts, string.format("己8(-%d)", myEightCount))
+            end
+            if opponentEightCount > 0 then
+                table.insert(parts, string.format("对8(+%d)", opponentEightCount * 2))
+            end
+            table.insert(breakdown.effects, table.concat(parts, ","))
         end
 
         breakdown.final = points
@@ -287,7 +302,7 @@ function RuleEngine.Settle(playerHand, aiHand, playerState, aiState)
         local playerPts, playerDetails = RuleEngine.CalculatePoints(playerHand, aiHand, playerState, aiState)
         local aiPts, aiDetails = RuleEngine.CalculatePoints(aiHand, playerHand, aiState, playerState)
 
-        -- K 效果: 持有K时，对方点数向上取整到十位，自己点数-5后向下取整到十位
+        -- K 效果: 持有K时，对方点数向上取整到十位，自己点数向下取整到十位
         local playerKings = playerDetails.kingCount or 0
         local aiKings = aiDetails.kingCount or 0
 
@@ -299,13 +314,13 @@ function RuleEngine.Settle(playerHand, aiHand, playerState, aiState)
         end
 
         if playerKings > 0 then
-            aiPts = ceilToTen(aiPts)               -- 对方向上取整到十位
-            playerPts = floorToTen(playerPts - 5)  -- 自己-5后向下取整到十位
+            aiPts = ceilToTen(aiPts)         -- 对方向上取整到十位
+            playerPts = floorToTen(playerPts) -- 自己向下取整到十位
             playerDetails.kingApplied = true
         end
         if aiKings > 0 then
-            playerPts = ceilToTen(playerPts)       -- 对方向上取整到十位
-            aiPts = floorToTen(aiPts - 5)          -- 自己-5后向下取整到十位
+            playerPts = ceilToTen(playerPts)  -- 对方向上取整到十位
+            aiPts = floorToTen(aiPts)         -- 自己向下取整到十位
             aiDetails.kingApplied = true
         end
 

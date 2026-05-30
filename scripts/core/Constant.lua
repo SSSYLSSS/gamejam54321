@@ -73,12 +73,12 @@ Constant.EFFECT = {
     NONE            = "none",
     ACE_DOUBLE      = "ace_double",       -- A: 翻倍对手同花色
     SEVEN_IMMUNE    = "seven_immune",     -- 7: 不可被改变点数/删除, 可弃置
-    EIGHT_REDUCE    = "eight_reduce",     -- 8: 降低自己普通牌1点
+    EIGHT_REDUCE    = "eight_reduce",     -- 8: 己方普通牌-1, 对方普通牌+2
     NINE_FLEX       = "nine_flex",        -- 9: 点数可视为0或9
     TEN_BONUS       = "ten_bonus",        -- 10: 若弃置过, 最终+1
     JACK_DRAW       = "jack_draw",        -- J: 弃置时所有补牌可逐张选择从弃牌堆或抽牌堆抽取
     QUEEN_TRIPLE    = "queen_triple",     -- Q: 使对方最小普通牌点数×3
-    KING_BONUS      = "king_bonus",       -- K: 手中有K则最终+1
+    KING_BONUS      = "king_bonus",       -- K: 对方向上取整到十位, 己方向下取整到十位
     JOKER_SMALL     = "joker_small",      -- 小王: 移除对方一张牌
     JOKER_BIG       = "joker_big",        -- 大王: 选择自己任意点数
 }

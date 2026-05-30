@@ -56,7 +56,7 @@ local PAGES = {
         content = {
             { type = "card", rank = "A", desc = "结算时翻倍对手同花色普通牌" },
             { type = "card", rank = "7", desc = "不可被其他效果改变或删除" },
-            { type = "card", rank = "8", desc = "降低自己所有普通牌各1点(可叠加)" },
+            { type = "card", rank = "8", desc = "结算时己方普通牌各-1点,\n对方普通牌各+2点(可叠加)" },
             { type = "card", rank = "9", desc = "灵活牌：可视为 0 或 9 点" },
             { type = "card", rank = "10", desc = "若曾被弃置过，最终得分+1" },
         }
@@ -67,7 +67,7 @@ local PAGES = {
         content = {
             { type = "card", rank = "J", desc = "弃置含J时, 所有补牌可选来源;\n结算时手中有J则对方普通牌×2" },
             { type = "card", rank = "Q", desc = "使对方最大普通牌点数×2(可叠加)" },
-            { type = "card", rank = "K", desc = "对方点数向上取整到十位\n己方-5后向下取整到十位" },
+            { type = "card", rank = "K", desc = "对方点数向上取整到十位\n己方点数向下取整到十位" },
             { type = "gap" },
             { type = "highlight", value = "三张7特殊规则：手持三张7直接获胜！" },
         }
