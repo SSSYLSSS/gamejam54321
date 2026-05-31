@@ -246,7 +246,7 @@ function GameScene._CreateTopBar()
                     },
                     UI.Label {
                         id = "titleLabel",
-                        text = "五!四!三!二十一点!",
+                        text = "五!四!三!二一!",
                         fontSize = 16,
                         fontColor = Colors.gold,
                     },

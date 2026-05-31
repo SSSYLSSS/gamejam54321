@@ -1,0 +1,242 @@
+{
+  "startTime": "2026-05-30T21:03:48.609Z",
+  "endTime": "2026-05-30T21:04:07.311Z",
+  "duration": "18702ms",
+  "result": {
+    "success": true
+  },
+  "steps": [
+    {
+      "time": "2026-05-30T21:03:49.180Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "start"
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:00.307Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "done"
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:00.307Z",
+      "stage": "network_config",
+      "data": {
+        "env": "production"
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:00.310Z",
+      "stage": "load_config",
+      "data": {
+        "projectId": "p_edq1",
+        "configPath": "/userspaces/11c21619-0020-4db2-9f5d-ea4ff6603054/workspace/.project/project.json",
+        "taptap_publish": {
+          "title": "五!四!三!二十一点!",
+          "description": "一款以21点为基础的策略卡牌对战游戏，通过抽牌、弃牌、保留等策略操作，配合丰富的特殊牌效果，让手牌点数尽可能接近21点。",
+          "category": "card",
+          "screen_orientation": "landscape",
+          "collection_type": "sce",
+          "trial_note": "聚光灯48小时GameJam广州站2026参赛作品",
+          "app_platforms": "2",
+          "developer_id": 338945,
+          "app_id": 864923,
+          "miniapp_id": "tapmckjjgpsgcsllbh"
+        },
+        "assets": {
+          "icon": "./assets/image/game_icon_cards_v3_20260530210038.png",
+          "screenshots": [
+            "./assets/image/screenshot_menu.png",
+            "./assets/image/screenshot_gameplay.png",
+            "./assets/image/screenshot_battle.png"
+          ],
+          "promotional_image": "./game_material/PROMO_2026-05-30T20-52-20_01.jpg",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/game_icon_cards_v3_20260530210038.png",
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二十一点!/PROMO_2026-05-30T20-52-20_01.jpg",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_menu.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_gameplay.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_battle.png"
+          ],
+          "cover_horizontal": "./.project/game_material/COVER_HORIZONTAL_2026-05-30T21-01-44_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二十一点!/COVER_HORIZONTAL_2026-05-30T21-01-44_01.png",
+          "cover_vertical": "./.project/game_material/COVER_VERTICAL_2026-05-30T21-01-44_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二十一点!/COVER_VERTICAL_2026-05-30T21-01-44_01.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:00.934Z",
+      "stage": "update_game",
+      "data": {
+        "app_id": 864923,
+        "developer_id": 338945
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:00.936Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "start",
+        "assets": {
+          "icon": "./assets/image/game_icon_cards_v3_20260530210038.png",
+          "screenshots": [
+            "./assets/image/screenshot_menu.png",
+            "./assets/image/screenshot_gameplay.png",
+            "./assets/image/screenshot_battle.png"
+          ],
+          "promotional_image": "./game_material/PROMO_2026-05-30T20-52-20_01.jpg",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/game_icon_cards_v3_20260530210038.png",
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二十一点!/PROMO_2026-05-30T20-52-20_01.jpg",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_menu.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_gameplay.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_battle.png"
+          ],
+          "cover_horizontal": "./.project/game_material/COVER_HORIZONTAL_2026-05-30T21-01-44_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二十一点!/COVER_HORIZONTAL_2026-05-30T21-01-44_01.png",
+          "cover_vertical": "./.project/game_material/COVER_VERTICAL_2026-05-30T21-01-44_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二十一点!/COVER_VERTICAL_2026-05-30T21-01-44_01.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:03.493Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "path": "./.project/game_material/COVER_HORIZONTAL_2026-05-30T21-01-44_01.png",
+        "resolvedPath": "/userspaces/11c21619-0020-4db2-9f5d-ea4ff6603054/workspace/.project/game_material/COVER_HORIZONTAL_2026-05-30T21-01-44_01.png"
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:03.509Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "fileSize": 2039712
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:04.237Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "response": {
+          "result": true,
+          "image_url": "https://img-tc.tapimg.com/market/images/FvQVUeLMdPgUp0DbtWUeZ3lIqDac.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:04.237Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "path": "./.project/game_material/COVER_VERTICAL_2026-05-30T21-01-44_01.png",
+        "resolvedPath": "/userspaces/11c21619-0020-4db2-9f5d-ea4ff6603054/workspace/.project/game_material/COVER_VERTICAL_2026-05-30T21-01-44_01.png"
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:04.252Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "fileSize": 2092379
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:05.067Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "response": {
+          "result": true,
+          "image_url": "https://img-tc.tapimg.com/market/images/FtvTVBf2p6t7flvhgkmIsLAxdyBY.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:05.067Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "done",
+        "uploadedAssets": {
+          "iconUrl": "https://img-tc.tapimg.com/market/images/Fu4PhEFrZ66xZox57hILvqlZN1C2.png",
+          "screenshotUrls": [
+            "https://img-tc.tapimg.com/market/images/FsOcXGU6Uzse-D_PvBM1wP9DRin8.png",
+            "https://img-tc.tapimg.com/market/images/FtYR2JKTvIVrBcXbTtpPefsRud_p.png",
+            "https://img-tc.tapimg.com/market/images/FjeOZrhWVBVYP9VEDKwrHpYhVCVU.png"
+          ],
+          "bannerUrl": "https://img-tc.tapimg.com/market/images/Foj7TCjILpM_6jAH1Piz_gVbU3Ec.jpg",
+          "coverUrl": "https://img-tc.tapimg.com/market/images/FvQVUeLMdPgUp0DbtWUeZ3lIqDac.png",
+          "coverVerticalUrl": "https://img-tc.tapimg.com/market/images/FtvTVBf2p6t7flvhgkmIsLAxdyBY.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:05.067Z",
+      "stage": "submit_spark_request",
+      "data": {
+        "app_id": 864923,
+        "developer_id": 338945,
+        "map_version": "3",
+        "sce_project_id": "p_edq1",
+        "category": "card",
+        "collection_type": "card",
+        "description": "一款以21点为基础的策略卡牌对战游戏，通过抽牌、弃牌、保留等策略操作，配合丰富的特殊牌效果，让手牌点数尽可能接近21点。",
+        "screen_orientation": 2,
+        "title": "五!四!三!二十一点!",
+        "icon": "https://img-tc.tapimg.com/market/images/Fu4PhEFrZ66xZox57hILvqlZN1C2.png",
+        "screenshots": [
+          "https://img-tc.tapimg.com/market/images/FsOcXGU6Uzse-D_PvBM1wP9DRin8.png",
+          "https://img-tc.tapimg.com/market/images/FtYR2JKTvIVrBcXbTtpPefsRud_p.png",
+          "https://img-tc.tapimg.com/market/images/FjeOZrhWVBVYP9VEDKwrHpYhVCVU.png"
+        ],
+        "banner": "https://img-tc.tapimg.com/market/images/Foj7TCjILpM_6jAH1Piz_gVbU3Ec.jpg",
+        "trial_note": "聚光灯48小时GameJam广州站2026参赛作品",
+        "app_platforms": "2",
+        "cover": "https://img-tc.tapimg.com/market/images/FvQVUeLMdPgUp0DbtWUeZ3lIqDac.png",
+        "cover_vertical": "https://img-tc.tapimg.com/market/images/FtvTVBf2p6t7flvhgkmIsLAxdyBY.png",
+        "publish_intl": false
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:07.150Z",
+      "stage": "submit_spark_response",
+      "data": {
+        "app_id": 864923,
+        "app_title": "五!四!三!二十一点!",
+        "category": "card",
+        "category_label": "卡牌",
+        "display_app_title": "卡牌游戏合集"
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:07.150Z",
+      "stage": "update_project_app_id",
+      "data": {
+        "stage": "start",
+        "project_id": "p_edq1",
+        "app_id": 864923
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:07.311Z",
+      "stage": "update_project_app_id",
+      "data": {
+        "stage": "success",
+        "project_id": "p_edq1",
+        "app_id": 864923
+      }
+    },
+    {
+      "time": "2026-05-30T21:04:07.311Z",
+      "stage": "publish_result",
+      "data": {
+        "action": "updated",
+        "status": "pending_review",
+        "game_id": 864923,
+        "message": "成功更新游戏 \"五!四!三!二十一点!\"",
+        "developer_id": 338945,
+        "config_file_path": "/userspaces/11c21619-0020-4db2-9f5d-ea4ff6603054/workspace/.project/project.json"
+      }
+    }
+  ]
+}

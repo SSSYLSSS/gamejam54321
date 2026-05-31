@@ -1,0 +1,18 @@
+{
+  "startTime": "2026-05-31T03:43:42.379Z",
+  "endTime": "2026-05-31T03:43:42.891Z",
+  "duration": "512ms",
+  "result": {
+    "success": false,
+    "error": "project.json 解析失败: SyntaxError: Expected double-quoted property name in JSON at position 623"
+  },
+  "steps": [
+    {
+      "time": "2026-05-31T03:43:42.890Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "start"
+      }
+    }
+  ]
+}

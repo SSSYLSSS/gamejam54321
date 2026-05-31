@@ -5,21 +5,43 @@
     "id": "1836375304"
   },
   "entry": "main.lua",
-  "version": "1.0.0",
+  "version": "1.0.23",
   "taptap_publish": {
-    "title": "<game title, required>",
-    "description": "<game description>",
-    "category": "<game category: rpg, casual, action, strategy, simulation, trivia, arcade, adventure, card, sports, racing, puzzle, educational, music, word, board>",
+    "title": "五!四!三!二一!",
+    "description": "一款策略卡牌对战游戏，通过抽牌、弃牌、保留等策略操作，配合丰富的特殊牌效果，在五轮博弈中击败对手。",
+    "category": "card",
     "screen_orientation": "landscape",
     "collection_type": "sce",
-    "trial_note": "<developer's note>",
-    "app_platforms": "1,2"
+    "trial_note": "聚光灯48小时GameJam广州站2026参赛作品",
+    "app_platforms": "2",
+    "developer_id": 338945,
+    "app_id": 864979,
+    "miniapp_id": "tapmcbxul71ozpwrom"
   },
   "assets": {
-    "icon": "",
-    "screenshots": [],
-    "promotional_image": ""
+    "icon": "./assets/image/game_icon_cards_v3_20260530210038.png",
+    "screenshots": [
+      "./game_material/SCREENSHOT_2026-05-31T03-38-58_01.png",
+      "./assets/image/screenshot_gameplay.png",
+      "./assets/image/screenshot_battle.png"
+    ],
+    "promotional_image": "./game_material/promotional.png",
+    "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/game_icon_cards_v3_20260530210038.png",
+    "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/promotional.png",
+    "screenshot_urls": [
+      "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/SCREENSHOT_2026-05-31T03-38-58_01.png",
+      "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_gameplay.png",
+      "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_battle.png"
+    ],
+    "cover_horizontal": "./.project/game_material/COVER_HORIZONTAL_2026-05-31T03-48-49_01.png",
+    "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二一!/COVER_HORIZONTAL_2026-05-31T03-48-49_01.png",
+    "cover_vertical": "./.project/game_material/COVER_VERTICAL_2026-05-31T03-48-49_01.png",
+    "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二一!/COVER_VERTICAL_2026-05-31T03-48-49_01.png"
   },
   "entry@client": "client_main.lua",
-  "entry@server": "server_main.lua"
+  "entry@server": "server_main.lua",
+  "metadata": {
+    "updated_at": "2026-05-31T03:49:54.818Z",
+    "promo_dependent_hash": "c9d58418e2a04519ed9c9d7ebd79abda"
+  }
 }

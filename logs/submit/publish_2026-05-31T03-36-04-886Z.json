@@ -1,0 +1,279 @@
+{
+  "startTime": "2026-05-31T03:36:04.886Z",
+  "endTime": "2026-05-31T03:36:31.228Z",
+  "duration": "26342ms",
+  "result": {
+    "success": false,
+    "error": "请求失败：400 Bad Request - 第 2 张游戏截图宽高比需与第一张保持一致"
+  },
+  "steps": [
+    {
+      "time": "2026-05-31T03:36:05.043Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "start"
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:17.870Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "done"
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:17.870Z",
+      "stage": "network_config",
+      "data": {
+        "env": "production"
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:18.060Z",
+      "stage": "load_config",
+      "data": {
+        "projectId": "p_edq1",
+        "configPath": "/userspaces/11c21619-0020-4db2-9f5d-ea4ff6603054/workspace/.project/project.json",
+        "taptap_publish": {
+          "title": "五!四!三!二一!",
+          "description": "一款策略卡牌对战游戏，通过抽牌、弃牌、保留等策略操作，配合丰富的特殊牌效果，在五轮博弈中击败对手。",
+          "category": "card",
+          "screen_orientation": "landscape",
+          "collection_type": "sce",
+          "trial_note": "聚光灯48小时GameJam广州站2026参赛作品",
+          "app_platforms": "2",
+          "developer_id": 338945,
+          "gameplay_demo_video_source": "https://tapcode-sce.spark.xd.com/videos/p_edq1/1780198127098-rec_03666c4d-1013-4a8c-afe0-87d5d99ffd87.mp4",
+          "app_id": 864974,
+          "miniapp_id": "tapmchx2ncgfxbf1ij"
+        },
+        "assets": {
+          "icon": "./assets/image/game_icon_cards_v3_20260530210038.png",
+          "screenshots": [
+            "./game_material/screenshot_1.png",
+            "./assets/image/screenshot_gameplay.png",
+            "./assets/image/screenshot_battle.png"
+          ],
+          "promotional_image": "./game_material/promotional.png",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/game_icon_cards_v3_20260530210038.png",
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/promotional.png",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_1.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_gameplay.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_battle.png"
+          ],
+          "cover_horizontal": "./.project/game_material/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二一!/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png",
+          "cover_vertical": "./.project/game_material/COVER_VERTICAL_2026-05-31T03-31-01_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二一!/COVER_VERTICAL_2026-05-31T03-31-01_01.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:18.424Z",
+      "stage": "update_game",
+      "data": {
+        "app_id": 864974,
+        "developer_id": 338945
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:18.439Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "start",
+        "assets": {
+          "icon": "./assets/image/game_icon_cards_v3_20260530210038.png",
+          "screenshots": [
+            "./game_material/screenshot_1.png",
+            "./assets/image/screenshot_gameplay.png",
+            "./assets/image/screenshot_battle.png"
+          ],
+          "promotional_image": "./game_material/promotional.png",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/game_icon_cards_v3_20260530210038.png",
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/promotional.png",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_1.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_gameplay.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_battle.png"
+          ],
+          "cover_horizontal": "./.project/game_material/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二一!/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png",
+          "cover_vertical": "./.project/game_material/COVER_VERTICAL_2026-05-31T03-31-01_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二一!/COVER_VERTICAL_2026-05-31T03-31-01_01.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:22.176Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "path": "./.project/game_material/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png",
+        "resolvedPath": "/userspaces/11c21619-0020-4db2-9f5d-ea4ff6603054/workspace/.project/game_material/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png"
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:22.844Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "fileSize": 2124687
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:23.936Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "response": {
+          "result": true,
+          "image_url": "https://img-tc.tapimg.com/market/images/Flc_HyJ34lbyts1fr_ko_4K-fH5h.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:23.937Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "path": "./.project/game_material/COVER_VERTICAL_2026-05-31T03-31-01_01.png",
+        "resolvedPath": "/userspaces/11c21619-0020-4db2-9f5d-ea4ff6603054/workspace/.project/game_material/COVER_VERTICAL_2026-05-31T03-31-01_01.png"
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:24.368Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "fileSize": 2032021
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:25.176Z",
+      "stage": "upload_cover_vertical",
+      "data": {
+        "response": {
+          "result": true,
+          "image_url": "https://img-tc.tapimg.com/market/images/FrblkMlJKt3nt2gpcKJn3QvVGUfN.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:25.176Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "done",
+        "uploadedAssets": {
+          "iconUrl": "https://img-tc.tapimg.com/market/images/Fu4PhEFrZ66xZox57hILvqlZN1C2.png",
+          "screenshotUrls": [
+            "https://img-tc.tapimg.com/market/images/FgZa5KJWtqHwwHHw2lnIQZH2-m2m.png",
+            "https://img-tc.tapimg.com/market/images/FtYR2JKTvIVrBcXbTtpPefsRud_p.png",
+            "https://img-tc.tapimg.com/market/images/FjeOZrhWVBVYP9VEDKwrHpYhVCVU.png"
+          ],
+          "bannerUrl": "https://img-tc.tapimg.com/market/images/Fqv-EyRPZ-wudLdwUVNyzfb8aTcw.png",
+          "coverUrl": "https://img-tc.tapimg.com/market/images/Flc_HyJ34lbyts1fr_ko_4K-fH5h.png",
+          "coverVerticalUrl": "https://img-tc.tapimg.com/market/images/FrblkMlJKt3nt2gpcKJn3QvVGUfN.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:25.238Z",
+      "stage": "resolve_gameplay_demo_video",
+      "data": {
+        "source": "https://tapcode-sce.spark.xd.com/videos/p_edq1/1780198127098-rec_03666c4d-1013-4a8c-afe0-87d5d99ffd87.mp4",
+        "sourceType": "remote",
+        "appId": 864974,
+        "developerId": 338945
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:25.239Z",
+      "stage": "resolve_gameplay_demo_video_cache_lookup",
+      "data": {}
+    },
+    {
+      "time": "2026-05-31T03:36:27.033Z",
+      "stage": "resolve_gameplay_demo_video_remote_delegate",
+      "data": {
+        "source": "https://tapcode-sce.spark.xd.com/videos/p_edq1/1780198127098-rec_03666c4d-1013-4a8c-afe0-87d5d99ffd87.mp4",
+        "videoDownloadUrl": "https://tapcode-sce.spark.xd.com/videos/p_edq1/1780198127098-rec_03666c4d-1013-4a8c-afe0-87d5d99ffd87.mp4",
+        "fileName": "1780198127098-rec_03666c4d-1013-4a8c-afe0-87d5d99ffd87.mp4"
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:27.033Z",
+      "stage": "resolve_gameplay_demo_video_upload_start",
+      "data": {
+        "source": "https://tapcode-sce.spark.xd.com/videos/p_edq1/1780198127098-rec_03666c4d-1013-4a8c-afe0-87d5d99ffd87.mp4",
+        "sourceType": "remote",
+        "fileName": "1780198127098-rec_03666c4d-1013-4a8c-afe0-87d5d99ffd87.mp4",
+        "videoDownloadUrl": "https://tapcode-sce.spark.xd.com/videos/p_edq1/1780198127098-rec_03666c4d-1013-4a8c-afe0-87d5d99ffd87.mp4",
+        "remoteMetadata": {
+          "finalUrl": "https://tapcode-sce.spark.xd.com/videos/p_edq1/1780198127098-rec_03666c4d-1013-4a8c-afe0-87d5d99ffd87.mp4",
+          "etag": "\"BAB753DB30EC49F09D478029180A31F6\"",
+          "lastModified": "Sun, 31 May 2026 03:28:48 GMT",
+          "contentLength": 18600136
+        }
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:27.179Z",
+      "stage": "resolve_gameplay_demo_video_get_token",
+      "data": {
+        "ms": 146
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:30.456Z",
+      "stage": "resolve_gameplay_demo_video_qiniu_upload",
+      "data": {
+        "ms": 3277,
+        "key": "lhfh3xyER_sOsS3LAOheA5SR6Ain",
+        "sha256": "d14addf2e233f3dc3cd1e4a0113b904b6a79d2224e7b869f9d5af936c766d854",
+        "fileSize": 18600136,
+        "via": "map_server"
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:30.753Z",
+      "stage": "resolve_gameplay_demo_video_register",
+      "data": {
+        "ms": 297
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:30.870Z",
+      "stage": "resolve_gameplay_demo_video_upload_done",
+      "data": {
+        "sourceType": "remote",
+        "fileName": "1780198127098-rec_03666c4d-1013-4a8c-afe0-87d5d99ffd87.mp4",
+        "videoId": 5688403,
+        "cacheUpdated": true
+      }
+    },
+    {
+      "time": "2026-05-31T03:36:30.870Z",
+      "stage": "submit_spark_request",
+      "data": {
+        "app_id": 864974,
+        "developer_id": 338945,
+        "map_version": "10",
+        "sce_project_id": "p_edq1",
+        "category": "card",
+        "collection_type": "card",
+        "description": "一款策略卡牌对战游戏，通过抽牌、弃牌、保留等策略操作，配合丰富的特殊牌效果，在五轮博弈中击败对手。",
+        "screen_orientation": 2,
+        "title": "五!四!三!二一!",
+        "icon": "https://img-tc.tapimg.com/market/images/Fu4PhEFrZ66xZox57hILvqlZN1C2.png",
+        "screenshots": [
+          "https://img-tc.tapimg.com/market/images/FgZa5KJWtqHwwHHw2lnIQZH2-m2m.png",
+          "https://img-tc.tapimg.com/market/images/FtYR2JKTvIVrBcXbTtpPefsRud_p.png",
+          "https://img-tc.tapimg.com/market/images/FjeOZrhWVBVYP9VEDKwrHpYhVCVU.png"
+        ],
+        "banner": "https://img-tc.tapimg.com/market/images/Fqv-EyRPZ-wudLdwUVNyzfb8aTcw.png",
+        "trial_note": "聚光灯48小时GameJam广州站2026参赛作品",
+        "app_platforms": "2",
+        "cover": "https://img-tc.tapimg.com/market/images/Flc_HyJ34lbyts1fr_ko_4K-fH5h.png",
+        "cover_vertical": "https://img-tc.tapimg.com/market/images/FrblkMlJKt3nt2gpcKJn3QvVGUfN.png",
+        "gameplay_demo_video_id": 5688403,
+        "publish_intl": false
+      }
+    }
+  ]
+}

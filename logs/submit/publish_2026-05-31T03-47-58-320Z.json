@@ -1,0 +1,125 @@
+{
+  "startTime": "2026-05-31T03:47:58.320Z",
+  "endTime": "2026-05-31T03:48:13.688Z",
+  "duration": "15368ms",
+  "result": {
+    "success": false,
+    "error": "ENOENT: no such file or directory, open '/userspaces/11c21619-0020-4db2-9f5d-ea4ff6603054/workspace/.project/game_material/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png'"
+  },
+  "steps": [
+    {
+      "time": "2026-05-31T03:47:58.773Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "start"
+      }
+    },
+    {
+      "time": "2026-05-31T03:48:07.763Z",
+      "stage": "upload_to_cdn",
+      "data": {
+        "status": "done"
+      }
+    },
+    {
+      "time": "2026-05-31T03:48:07.763Z",
+      "stage": "network_config",
+      "data": {
+        "env": "production"
+      }
+    },
+    {
+      "time": "2026-05-31T03:48:07.766Z",
+      "stage": "load_config",
+      "data": {
+        "projectId": "p_edq1",
+        "configPath": "/userspaces/11c21619-0020-4db2-9f5d-ea4ff6603054/workspace/.project/project.json",
+        "taptap_publish": {
+          "title": "五!四!三!二一!",
+          "description": "一款策略卡牌对战游戏，通过抽牌、弃牌、保留等策略操作，配合丰富的特殊牌效果，在五轮博弈中击败对手。",
+          "category": "card",
+          "screen_orientation": "landscape",
+          "collection_type": "sce",
+          "trial_note": "聚光灯48小时GameJam广州站2026参赛作品",
+          "app_platforms": "2",
+          "developer_id": 338945,
+          "app_id": 864979,
+          "miniapp_id": "tapmcbxul71ozpwrom"
+        },
+        "assets": {
+          "icon": "./assets/image/game_icon_cards_v3_20260530210038.png",
+          "screenshots": [
+            "./game_material/SCREENSHOT_2026-05-31T03-38-58_01.png",
+            "./assets/image/screenshot_gameplay.png",
+            "./assets/image/screenshot_battle.png"
+          ],
+          "promotional_image": "./game_material/promotional.png",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/game_icon_cards_v3_20260530210038.png",
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/promotional.png",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/SCREENSHOT_2026-05-31T03-38-58_01.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_gameplay.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_battle.png"
+          ],
+          "cover_horizontal": "./.project/game_material/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二一!/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png",
+          "cover_vertical": "./.project/game_material/COVER_VERTICAL_2026-05-31T03-31-01_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二一!/COVER_VERTICAL_2026-05-31T03-31-01_01.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-31T03:48:08.591Z",
+      "stage": "update_project_app_id",
+      "data": {
+        "stage": "start",
+        "project_id": "p_edq1",
+        "app_id": 864979
+      }
+    },
+    {
+      "time": "2026-05-31T03:48:08.742Z",
+      "stage": "update_project_app_id",
+      "data": {
+        "stage": "success",
+        "project_id": "p_edq1",
+        "app_id": 864979
+      }
+    },
+    {
+      "time": "2026-05-31T03:48:09.533Z",
+      "stage": "upload_assets",
+      "data": {
+        "status": "start",
+        "assets": {
+          "icon": "./assets/image/game_icon_cards_v3_20260530210038.png",
+          "screenshots": [
+            "./game_material/SCREENSHOT_2026-05-31T03-38-58_01.png",
+            "./assets/image/screenshot_gameplay.png",
+            "./assets/image/screenshot_battle.png"
+          ],
+          "promotional_image": "./game_material/promotional.png",
+          "icon_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/game_icon_cards_v3_20260530210038.png",
+          "promotional_image_url": "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/promotional.png",
+          "screenshot_urls": [
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/SCREENSHOT_2026-05-31T03-38-58_01.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_gameplay.png",
+            "https://tapcode-sce.spark.xd.com/assets/game_material/p_edq1/screenshot_battle.png"
+          ],
+          "cover_horizontal": "./.project/game_material/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png",
+          "cover_horizontal_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二一!/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png",
+          "cover_vertical": "./.project/game_material/COVER_VERTICAL_2026-05-31T03-31-01_01.png",
+          "cover_vertical_url": "https://tapcode-sce.spark.xd.com/assets/game_material/五!四!三!二一!/COVER_VERTICAL_2026-05-31T03-31-01_01.png"
+        }
+      }
+    },
+    {
+      "time": "2026-05-31T03:48:13.687Z",
+      "stage": "upload_cover_horizontal",
+      "data": {
+        "path": "./.project/game_material/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png",
+        "resolvedPath": "/userspaces/11c21619-0020-4db2-9f5d-ea4ff6603054/workspace/.project/game_material/COVER_HORIZONTAL_2026-05-31T03-31-01_01.png"
+      }
+    }
+  ]
+}

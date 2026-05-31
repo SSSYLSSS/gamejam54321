@@ -74,7 +74,7 @@ function MenuScene.Build(callbacks)
     local bigTopPercent = math.floor(11 * titleScale)
     -- 五四三居中散列: 中心点分别在 30%, 50%, 70% 宽度
     -- 四在正中(50%), 五在左(30%), 三在右(70%)
-    -- 21居中在四下方(中心点50%)
+    -- 二一居中在四下方, 二在左(42%), 一在右(58%)
     -- left = 中心百分比 - 半宽/屏幕宽
     local halfSmall = smallSize * 0.5
     local halfBig = bigSize * 0.5
@@ -82,7 +82,8 @@ function MenuScene.Build(callbacks)
         { src = "pic/五.png", size = smallSize, x = tostring(math.floor((0.30 * sw - halfSmall) / sw * 100)) .. "%", y = "0%",  rotate = -12 },
         { src = "pic/四.png", size = smallSize, x = tostring(math.floor((0.50 * sw - halfSmall) / sw * 100)) .. "%", y = "0%",  rotate = 0 },
         { src = "pic/三.png", size = smallSize, x = tostring(math.floor((0.70 * sw - halfSmall) / sw * 100)) .. "%", y = "0%",  rotate = 10 },
-        { src = "pic/21.png", size = bigSize,   x = tostring(math.floor((0.50 * sw - halfBig) / sw * 100)) .. "%",   y = tostring(bigTopPercent) .. "%", rotate = -3 },
+        { src = "pic/二.png", size = bigSize,   x = tostring(math.floor((0.42 * sw - halfBig) / sw * 100)) .. "%",   y = tostring(bigTopPercent) .. "%", rotate = -5 },
+        { src = "pic/一.png", size = bigSize,   x = tostring(math.floor((0.58 * sw - halfBig) / sw * 100)) .. "%",   y = tostring(bigTopPercent) .. "%", rotate = 3 },
     }
     local titleWidgets = {}
     for i, img in ipairs(titleImages) do

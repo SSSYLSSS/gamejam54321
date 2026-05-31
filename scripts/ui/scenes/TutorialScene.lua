@@ -17,7 +17,7 @@ local PAGES = {
         title = "游戏简介",
         icon = "🎯",
         content = {
-            { type = "text", value = "本游戏为卡牌对战博弈游戏，是21点的改版。" },
+            { type = "text", value = "本游戏为卡牌对战博弈游戏，目标是让手牌点数尽可能接近21而不超过。" },
             { type = "gap" },
             { type = "highlight", value = "一轮游戏中，双方共进行5场对弈，\n先胜3场者赢得整场比赛。" },
             { type = "gap" },
@@ -43,11 +43,11 @@ local PAGES = {
         content = {
             { type = "text", value = "三个抽牌回合后，双方明牌结算：" },
             { type = "gap" },
-            { type = "highlight", value = "总点数超过21点即为「爆点」" },
+            { type = "highlight", value = "总点数超过21即为「爆点」" },
             { type = "gap" },
             { type = "text", value = "• 仅一方爆点 → 未爆点方直接获胜" },
-            { type = "text", value = "• 双方均未爆点 → 更接近21点者获胜" },
-            { type = "text", value = "• 双方均爆点 → 更接近21点者获胜\n  （即「爆得少」的赢）" },
+            { type = "text", value = "• 双方均未爆点 → 更接近21者获胜" },
+            { type = "text", value = "• 双方均爆点 → 更接近21者获胜\n  （即「爆得少」的赢）" },
             { type = "text", value = "• 距离相同 → 平局" },
         }
     },
